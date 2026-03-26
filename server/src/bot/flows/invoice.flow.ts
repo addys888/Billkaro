@@ -1,0 +1,367 @@
+import { User } from '@prisma/client';
+import { sendTextMessage, sendButtonMessage, sendMediaMessage } from '../../services/whatsapp.service';
+import { parseInvoiceFromText, ParsedInvoice } from '../../services/nlu.service';
+import { createInvoice } from '../../services/invoice.service';
+import { scheduleReminders } from '../../services/reminder.service';
+import { updateSession, clearSession } from '../session-manager';
+import { formatCurrency } from '../../utils/currency';
+import { formatDateShort, addDays } from '../../utils/dates';
+import { generateUPILink } from '../../utils/upi';
+import { formatBankDetails } from '../../services/payment.service';
+import { config } from '../../config';
+import { logger } from '../../utils/logger';
+
+interface SessionData {
+  currentFlow: string | null;
+  currentStep: string | null;
+  flowData: Record<string, any>;
+}
+
+/**
+ * Handle the invoice creation flow
+ */
+export async function handleInvoiceFlow(
+  phone: string,
+  input: string,
+  user: User,
+  session: SessionData
+): Promise<void> {
+  const step = session.currentStep;
+
+  // ── Handle button actions ──
+  if (input === '__CONFIRM__') {
+    await confirmAndSendInvoice(phone, user, session);
+    return;
+  }
+
+  if (input === '__CANCEL__') {
+    await clearSession(phone);
+    await sendTextMessage({ to: phone, text: '❌ Invoice cancelled.' });
+    return;
+  }
+
+  if (input === '__EDIT__') {
+    await updateSession(phone, { currentStep: 'edit_choice' });
+    await sendButtonMessage({
+      to: phone,
+      bodyText: 'What would you like to change?',
+      buttons: [
+        { id: 'edit_amount', title: '💰 Amount' },
+        { id: 'edit_client', title: '👤 Client' },
+        { id: 'edit_items', title: '📝 Items' },
+      ],
+    });
+    return;
+  }
+
+  if (input === '__SEND_TO_CLIENT__') {
+    await sendInvoiceToClient(phone, user, session);
+    return;
+  }
+
+  // ── Handle edit sub-steps ──
+  if (step === 'edit_choice') {
+    if (input === 'edit_amount') {
+      await updateSession(phone, { currentStep: 'edit_amount' });
+      await sendTextMessage({ to: phone, text: `Current amount: ${formatCurrency(session.flowData.parsedInvoice?.amount || 0)}.\n\nSend the new amount:` });
+      return;
+    }
+    if (input === 'edit_client') {
+      await updateSession(phone, { currentStep: 'edit_client' });
+      await sendTextMessage({ to: phone, text: 'Send the new client name:' });
+      return;
+    }
+    if (input === 'edit_items') {
+      await updateSession(phone, { currentStep: 'edit_items' });
+      await sendTextMessage({ to: phone, text: 'Send the new item description:' });
+      return;
+    }
+  }
+
+  if (step === 'edit_amount') {
+    const newAmount = parseFloat(input.replace(/[₹,]/g, ''));
+    if (isNaN(newAmount) || newAmount <= 0) {
+      await sendTextMessage({ to: phone, text: '⚠️ Please enter a valid amount.' });
+      return;
+    }
+    const parsed = session.flowData.parsedInvoice as ParsedInvoice;
+    parsed.amount = newAmount;
+    parsed.items = [{ name: parsed.items[0]?.name || 'Service', quantity: 1, rate: newAmount }];
+    await updateSession(phone, {
+      currentStep: 'confirm',
+      flowData: { ...session.flowData, parsedInvoice: parsed },
+    });
+    await sendConfirmationCard(phone, parsed, user);
+    return;
+  }
+
+  if (step === 'edit_client') {
+    const parsed = session.flowData.parsedInvoice as ParsedInvoice;
+    parsed.clientName = input.trim();
+    await updateSession(phone, {
+      currentStep: 'confirm',
+      flowData: { ...session.flowData, parsedInvoice: parsed },
+    });
+    await sendConfirmationCard(phone, parsed, user);
+    return;
+  }
+
+  if (step === 'edit_items') {
+    const parsed = session.flowData.parsedInvoice as ParsedInvoice;
+    parsed.items = [{ name: input.trim(), quantity: 1, rate: parsed.amount }];
+    await updateSession(phone, {
+      currentStep: 'confirm',
+      flowData: { ...session.flowData, parsedInvoice: parsed },
+    });
+    await sendConfirmationCard(phone, parsed, user);
+    return;
+  }
+
+  // ── Handle client phone number request ──
+  if (step === 'awaiting_client_phone') {
+    const clientPhone = input.replace(/[\s\-\+]/g, '');
+    if (clientPhone.length < 10) {
+      await sendTextMessage({ to: phone, text: '⚠️ Please send a valid phone number.' });
+      return;
+    }
+    // Ensure it starts with country code
+    const normalizedPhone = clientPhone.startsWith('91') ? clientPhone : `91${clientPhone}`;
+    await updateSession(phone, {
+      flowData: { ...session.flowData, clientPhone: normalizedPhone },
+    });
+    await sendInvoiceToClient(phone, user, {
+      ...session,
+      flowData: { ...session.flowData, clientPhone: normalizedPhone },
+    });
+    return;
+  }
+
+  // ── New invoice request — parse with NLU ──
+  const parsed = await parseInvoiceFromText(input);
+
+  if (!parsed) {
+    await sendTextMessage({
+      to: phone,
+      text: '🤔 I couldn\'t understand that. Please try like this:\n\n"Bill 5000 to Rahul for AC repair"\n\nor\n\n"Priya ko 8000 ka bill, CCTV installation"',
+    });
+    return;
+  }
+
+  // Save parsed data to session and show confirmation
+  await updateSession(phone, {
+    currentFlow: 'invoice',
+    currentStep: 'confirm',
+    flowData: { parsedInvoice: parsed },
+  });
+
+  await sendConfirmationCard(phone, parsed, user);
+}
+
+/**
+ * Send the confirmation card with invoice preview
+ */
+async function sendConfirmationCard(
+  phone: string,
+  parsed: ParsedInvoice,
+  user: User
+): Promise<void> {
+  const gstRate = Number(user.defaultGstRate);
+  const gstAmount = Math.round((parsed.amount * gstRate) / 100 * 100) / 100;
+  const total = parsed.amount + gstAmount;
+  const dueDays = parsed.dueDays || user.defaultPaymentTermsDays;
+  const dueDate = addDays(new Date(), dueDays);
+
+  const itemsList = parsed.items.map((i) => i.name).join(', ');
+
+  const preview = [
+    '📄 *Invoice Preview*',
+    '━━━━━━━━━━━━━━━━━━',
+    `🏢 *To:* ${parsed.clientName}`,
+    `💰 *Amount:* ${formatCurrency(parsed.amount)}`,
+    `📝 *For:* ${itemsList}`,
+    parsed.notes ? `📍 *Note:* ${parsed.notes}` : '',
+    gstRate > 0 ? `🏷️ *GST (${gstRate}%):* ${formatCurrency(gstAmount)}` : '',
+    `💵 *Total:* ${formatCurrency(total)}`,
+    `📅 *Due:* ${formatDateShort(dueDate)}`,
+  ].filter(Boolean).join('\n');
+
+  await sendButtonMessage({
+    to: phone,
+    bodyText: preview,
+    buttons: [
+      { id: 'confirm_send', title: '✅ Send Invoice' },
+      { id: 'edit_invoice', title: '✏️ Edit' },
+      { id: 'cancel_invoice', title: '❌ Cancel' },
+    ],
+  });
+}
+
+/**
+ * Confirm and create the invoice
+ */
+async function confirmAndSendInvoice(
+  phone: string,
+  user: User,
+  session: SessionData
+): Promise<void> {
+  const parsed = session.flowData.parsedInvoice as ParsedInvoice;
+  if (!parsed) {
+    await sendTextMessage({ to: phone, text: '❌ No invoice data found. Please start over.' });
+    await clearSession(phone);
+    return;
+  }
+
+  await sendTextMessage({ to: phone, text: '⏳ Creating your invoice...' });
+
+  try {
+    const result = await createInvoice({
+      userId: user.id,
+      clientName: parsed.clientName,
+      clientPhone: session.flowData.clientPhone,
+      amount: parsed.amount,
+      items: parsed.items,
+      notes: parsed.notes || undefined,
+      dueDays: parsed.dueDays || undefined,
+    });
+
+    // Schedule payment reminders
+    await scheduleReminders(result.id);
+
+    // Store invoice ID in session for follow-up
+    await updateSession(phone, {
+      currentStep: 'invoice_created',
+      flowData: {
+        ...session.flowData,
+        invoiceId: result.id,
+        invoiceNo: result.invoiceNo,
+        pdfUrl: result.pdfUrl,
+        paymentLink: result.paymentLink,
+      },
+    });
+
+    const successMsg = [
+      `✅ *Invoice #${result.invoiceNo} Created!*`,
+      '',
+      `💵 Total: ${formatCurrency(result.totalAmount)}`,
+      result.paymentLink ? `📲 UPI Pay: ${result.paymentLink}` : '',
+      '',
+      '━━━━━━━━━━━━━━━━━━',
+      '👉 *Forward this to your client?*',
+    ].filter(Boolean).join('\n');
+
+    await sendButtonMessage({
+      to: phone,
+      bodyText: successMsg,
+      buttons: [
+        { id: 'send_to_client', title: '📤 Send to Client' },
+        { id: 'cancel_invoice', title: '📋 Done' },
+      ],
+    });
+  } catch (error) {
+    logger.error('Invoice creation failed', { phone, error });
+    await sendTextMessage({
+      to: phone,
+      text: '❌ Failed to create invoice. Please try again.',
+    });
+    await clearSession(phone);
+  }
+}
+
+/**
+ * Send the invoice to the client via WhatsApp
+ */
+async function sendInvoiceToClient(
+  phone: string,
+  user: User,
+  session: SessionData
+): Promise<void> {
+  const { invoiceNo, pdfUrl, paymentLink, parsedInvoice } = session.flowData;
+  let clientPhone = session.flowData.clientPhone;
+
+  if (!clientPhone) {
+    // Ask for client's phone number
+    await updateSession(phone, { currentStep: 'awaiting_client_phone' });
+    await sendTextMessage({
+      to: phone,
+      text: `📱 ${parsedInvoice?.clientName || 'Client'} ka WhatsApp number bhejo:`,
+    });
+    return;
+  }
+
+  try {
+    const gstRate = Number(user.defaultGstRate);
+    const gstAmount = Math.round((parsedInvoice.amount * gstRate) / 100 * 100) / 100;
+    const total = parsedInvoice.amount + gstAmount;
+    const description = parsedInvoice.items.map((i: any) => i.name).join(', ');
+    const dueDays = parsedInvoice.dueDays || user.defaultPaymentTermsDays;
+    const dueDate = addDays(new Date(), dueDays);
+
+    // Generate UPI pay link for the WhatsApp message
+    let upiPayLine = '';
+    if (user.upiId) {
+      const upiLink = generateUPILink({
+        upiId: user.upiId,
+        payeeName: user.businessName,
+        amount: total,
+        transactionNote: `Invoice ${invoiceNo}`,
+      });
+      upiPayLine = `📲 *Pay via UPI:* ${upiLink}`;
+    }
+
+    // Bank details fallback
+    const bankLine = formatBankDetails({
+      accountName: user.bankAccountName,
+      accountNo: user.bankAccountNo,
+      ifsc: user.bankIfsc,
+      bankName: user.bankName,
+    });
+
+    // Send invoice message to client
+    const clientMsg = [
+      `🧾 *Invoice from ${user.businessName}*`,
+      '',
+      `Hi ${parsedInvoice.clientName},`,
+      '',
+      `Please find your invoice #${invoiceNo} for ${formatCurrency(total)} (${description}).`,
+      '',
+      upiPayLine,
+      user.upiId ? `UPI ID: ${user.upiId}` : '',
+      '',
+      bankLine || '',
+      '',
+      `Due by: ${formatDateShort(dueDate)}`,
+      '',
+      `*Zero convenience fee* — pay directly to our account 💰`,
+      '',
+      `Thank you for your business! 🙏`,
+      `— ${user.businessName}`,
+    ].filter(Boolean).join('\n');
+
+    await sendTextMessage({ to: clientPhone, text: clientMsg });
+
+    // Send PDF if available
+    if (pdfUrl) {
+      await sendMediaMessage({
+        to: clientPhone,
+        type: 'document',
+        mediaUrl: `${config.APP_URL}${pdfUrl}`,
+        caption: `Invoice #${invoiceNo}`,
+        filename: `${invoiceNo}.pdf`,
+      });
+    }
+
+    await sendTextMessage({
+      to: phone,
+      text: `✅ Invoice #${invoiceNo} sent to ${parsedInvoice.clientName}! 🎉\n\nReminders are scheduled automatically.`,
+    });
+
+    await clearSession(phone);
+  } catch (error) {
+    logger.error('Failed to send invoice to client', { phone, clientPhone, error });
+    await sendTextMessage({
+      to: phone,
+      text: '❌ Failed to send to client. You can share the invoice manually.',
+    });
+    await clearSession(phone);
+  }
+}

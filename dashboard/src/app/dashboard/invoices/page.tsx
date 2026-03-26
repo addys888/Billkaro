@@ -1,0 +1,241 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { apiFetch } from '@/lib/api';
+import { formatCurrency, formatDate, getStatusBadge } from '@/lib/utils';
+
+interface Invoice {
+  id: string;
+  invoiceNo: string;
+  status: string;
+  clientName: string;
+  clientPhone: string | null;
+  totalAmount: number;
+  description: string | null;
+  pdfUrl: string | null;
+  paymentLink: string | null;
+  dueDate: string;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+interface InvoiceResponse {
+  invoices: Invoice[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export default function InvoicesPage() {
+  const [data, setData] = useState<InvoiceResponse | null>(null);
+  const [status, setStatus] = useState('all');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+
+  const loadInvoices = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '20',
+        ...(status !== 'all' && { status }),
+        ...(search && { search }),
+      });
+      const result = await apiFetch<InvoiceResponse>(`/api/invoices?${params}`);
+      setData(result);
+    } catch (error) {
+      console.error('Failed to load invoices:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, status, search]);
+
+  useEffect(() => {
+    const debounce = setTimeout(loadInvoices, 300);
+    return () => clearTimeout(debounce);
+  }, [loadInvoices]);
+
+  const handleMarkPaid = async (invoiceId: string) => {
+    if (!confirm('Mark this invoice as paid?')) return;
+    try {
+      await apiFetch(`/api/invoices/${invoiceId}/mark-paid`, {
+        method: 'PATCH',
+        body: JSON.stringify({ paymentMethod: 'manual' }),
+      });
+      loadInvoices();
+    } catch (error) {
+      alert('Failed to mark as paid');
+    }
+  };
+
+  const handleResend = async (invoiceId: string) => {
+    try {
+      await apiFetch(`/api/invoices/${invoiceId}/resend`, { method: 'POST' });
+      alert('Invoice resent via WhatsApp!');
+    } catch (error) {
+      alert('Failed to resend invoice');
+    }
+  };
+
+  return (
+    <div>
+      <div className="main-header">
+        <h1>📋 Invoices</h1>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-outline btn-sm" id="export-csv-btn">
+            📥 Export CSV
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="filters-bar">
+        <div className="search-bar" style={{ flex: 1 }}>
+          <span className="search-icon">🔍</span>
+          <input
+            className="input"
+            style={{ paddingLeft: 36 }}
+            placeholder="Search by client, invoice #, or amount..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            id="invoice-search"
+          />
+        </div>
+        <select
+          className="select"
+          value={status}
+          onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+          id="status-filter"
+        >
+          <option value="all">All Status</option>
+          <option value="pending">⏳ Pending</option>
+          <option value="paid">✅ Paid</option>
+          <option value="overdue">🔴 Overdue</option>
+          <option value="cancelled">❌ Cancelled</option>
+        </select>
+      </div>
+
+      {/* Invoice Table */}
+      <div className="card" style={{ padding: 0 }}>
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Invoice #</th>
+                <th>Client</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Due Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    {Array.from({ length: 7 }).map((_, j) => (
+                      <td key={j}><div className="skeleton" style={{ width: '80%', height: 16 }} /></td>
+                    ))}
+                  </tr>
+                ))
+              ) : data && data.invoices.length > 0 ? (
+                data.invoices.map((inv) => {
+                  const badge = getStatusBadge(inv.status);
+                  return (
+                    <tr key={inv.id}>
+                      <td style={{ fontWeight: 600, color: '#2563eb' }}>{inv.invoiceNo}</td>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{inv.clientName}</div>
+                        {inv.description && (
+                          <div className="text-xs text-muted">{inv.description}</div>
+                        )}
+                      </td>
+                      <td style={{ fontWeight: 700 }}>{formatCurrency(inv.totalAmount)}</td>
+                      <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
+                      <td className="text-sm text-secondary">{formatDate(inv.createdAt)}</td>
+                      <td className="text-sm text-secondary">{formatDate(inv.dueDate)}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {inv.status !== 'PAID' && (
+                            <button
+                              className="btn btn-sm btn-outline"
+                              onClick={() => handleMarkPaid(inv.id)}
+                              title="Mark as paid"
+                            >
+                              ✅
+                            </button>
+                          )}
+                          <button
+                            className="btn btn-sm btn-outline"
+                            onClick={() => handleResend(inv.id)}
+                            title="Resend to client"
+                          >
+                            📤
+                          </button>
+                          {inv.pdfUrl && (
+                            <a
+                              href={`${process.env.NEXT_PUBLIC_API_URL}${inv.pdfUrl}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-sm btn-outline"
+                              title="View PDF"
+                            >
+                              📄
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={7}>
+                    <div className="empty-state">
+                      <div className="icon">📄</div>
+                      <h3>No invoices found</h3>
+                      <p>Create your first invoice by sending a message on WhatsApp!</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {data && data.totalPages > 1 && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '12px 16px',
+            borderTop: '1px solid var(--color-border)',
+          }}>
+            <span className="text-sm text-muted">
+              Showing {((page - 1) * 20) + 1}–{Math.min(page * 20, data.total)} of {data.total}
+            </span>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button
+                className="btn btn-sm btn-outline"
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+              >
+                ← Prev
+              </button>
+              <button
+                className="btn btn-sm btn-outline"
+                disabled={page >= data.totalPages}
+                onClick={() => setPage(page + 1)}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

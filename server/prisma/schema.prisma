@@ -1,0 +1,161 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Users (Business Owners) ────────────────────────────────
+model User {
+  id                     String    @id @default(uuid())
+  phone                  String    @unique
+  businessName           String    @map("business_name")
+  gstin                  String?
+  upiId                  String?   @map("upi_id")
+  businessAddress        String?   @map("business_address")
+  bankAccountNo          String?   @map("bank_account_no")
+  bankIfsc               String?   @map("bank_ifsc")
+  bankAccountName        String?   @map("bank_account_name")
+  bankName               String?   @map("bank_name")
+  defaultPaymentTermsDays Int      @default(7) @map("default_payment_terms_days")
+  defaultGstRate         Decimal   @default(18) @map("default_gst_rate") @db.Decimal(4, 2)
+  onboardingComplete     Boolean   @default(false) @map("onboarding_complete")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  clients                Client[]
+  invoices               Invoice[]
+
+  @@map("users")
+}
+
+// ── Clients (of the business owner) ────────────────────────
+model Client {
+  id                     String    @id @default(uuid())
+  userId                 String    @map("user_id")
+  name                   String
+  phone                  String?
+  gstin                  String?
+  email                  String?
+  paymentScore           Decimal   @default(5.00) @map("payment_score") @db.Decimal(3, 2)
+  totalInvoiced          Decimal   @default(0) @map("total_invoiced") @db.Decimal(14, 2)
+  totalPaid              Decimal   @default(0) @map("total_paid") @db.Decimal(14, 2)
+  avgDaysToPay           Decimal   @default(0) @map("avg_days_to_pay") @db.Decimal(6, 2)
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoices               Invoice[]
+
+  @@unique([userId, phone])
+  @@index([userId])
+  @@index([name])
+  @@map("clients")
+}
+
+// ── Invoices ───────────────────────────────────────────────
+model Invoice {
+  id                     String    @id @default(uuid())
+  userId                 String    @map("user_id")
+  clientId               String    @map("client_id")
+  invoiceNo              String    @unique @map("invoice_no")
+  status                 InvoiceStatus @default(PENDING)
+  subtotal               Decimal   @db.Decimal(12, 2)
+  gstRate                Decimal   @default(18) @map("gst_rate") @db.Decimal(4, 2)
+  gstAmount              Decimal   @map("gst_amount") @db.Decimal(12, 2)
+  totalAmount            Decimal   @map("total_amount") @db.Decimal(12, 2)
+  description            String?
+  lineItems              Json      @default("[]") @map("line_items")
+  notes                  String?
+  pdfUrl                 String?   @map("pdf_url")
+  paymentLink            String?   @map("payment_link")
+  upiLink                String?   @map("upi_link")
+  dueDate                DateTime  @map("due_date") @db.Date
+  paidAt                 DateTime? @map("paid_at")
+  paymentMethod          String?   @map("payment_method")
+  transactionId          String?   @map("transaction_id")
+  sentToClient           Boolean   @default(false) @map("sent_to_client")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client                 Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  reminders              Reminder[]
+
+  @@index([userId])
+  @@index([clientId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+// ── Payment Reminders ──────────────────────────────────────
+model Reminder {
+  id                     String    @id @default(uuid())
+  invoiceId              String    @map("invoice_id")
+  reminderType           ReminderType @map("reminder_type")
+  scheduledAt            DateTime  @map("scheduled_at")
+  sentAt                 DateTime? @map("sent_at")
+  status                 ReminderStatus @default(SCHEDULED)
+  bullJobId              String?   @map("bull_job_id")
+  createdAt              DateTime  @default(now()) @map("created_at")
+
+  invoice                Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("reminders")
+}
+
+// ── OTP for Authentication ─────────────────────────────────
+model Otp {
+  id                     String    @id @default(uuid())
+  phone                  String
+  code                   String
+  expiresAt              DateTime  @map("expires_at")
+  verified               Boolean   @default(false)
+  createdAt              DateTime  @default(now()) @map("created_at")
+
+  @@index([phone, code])
+  @@map("otps")
+}
+
+// ── Conversation State (for WhatsApp bot flows) ────────────
+model ConversationState {
+  id                     String    @id @default(uuid())
+  phone                  String    @unique
+  currentFlow            String?   @map("current_flow")
+  currentStep            String?   @map("current_step")
+  flowData               Json      @default("{}") @map("flow_data")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  @@map("conversation_states")
+}
+
+// ── Enums ──────────────────────────────────────────────────
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum ReminderType {
+  DUE_DATE
+  FOLLOW_UP_1
+  FOLLOW_UP_2
+  ESCALATION
+}
+
+enum ReminderStatus {
+  SCHEDULED
+  SENT
+  CANCELLED
+  PAUSED
+}
