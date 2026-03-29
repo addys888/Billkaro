@@ -94,12 +94,21 @@ export async function handleIncomingMessage(message: any, senderPhone: string): 
         await sendHelpMessage(senderPhone);
         break;
     }
-  } catch (error) {
-    logger.error('Message handler error', { senderPhone, error });
-    await sendTextMessage({
-      to: senderPhone,
-      text: '❌ Oops! Something went wrong. Please try again in a moment.',
+  } catch (error: any) {
+    logger.error('Message handler error', { 
+      senderPhone, 
+      errorMessage: error?.message,
+      errorStack: error?.stack,
+      error 
     });
+    try {
+      await sendTextMessage({
+        to: senderPhone,
+        text: '❌ Oops! Something went wrong. Please try again in a moment.',
+      });
+    } catch (_) {
+      // Ignore errors when sending error message
+    }
   }
 }
 
