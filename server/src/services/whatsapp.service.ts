@@ -114,7 +114,8 @@ export async function sendTemplateMessage(params: {
  */
 export async function downloadMedia(mediaId: string): Promise<Buffer> {
   // Step 1: Get media URL
-  const mediaInfo = await callWhatsAppAPI(`/${mediaId}`, null, 'GET') as { url: string };
+  const mediaApiUrl = `https://graph.facebook.com/${config.WHATSAPP_API_VERSION}/${mediaId}`;
+  const mediaInfo = await callWhatsAppAPI(mediaApiUrl, null, 'GET') as { url: string };
 
   // Step 2: Download the actual media
   const response = await fetch(mediaInfo.url, {
