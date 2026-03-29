@@ -172,6 +172,7 @@ async function callWhatsAppAPI(
     const data = await response.json();
 
     if (!response.ok) {
+      require('fs').writeFileSync('/tmp/billkaro_error.json', JSON.stringify({ status: response.status, data, url }, null, 2));
       logger.error('WhatsApp API error', {
         status: response.status,
         url,

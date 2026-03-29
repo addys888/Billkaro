@@ -57,7 +57,7 @@ async function handleMarkPaid(phone: string, input: string, user: User): Promise
   const invoiceNoMatch = input.match(/BK-\d{4}-\d{4}/i);
 
   if (invoiceNoMatch) {
-    const invoice = await getInvoiceByNumber(invoiceNoMatch[0].toUpperCase());
+    const invoice = await getInvoiceByNumber(invoiceNoMatch[0].toUpperCase(), user.id);
     if (invoice && invoice.userId === user.id) {
       await markInvoicePaid(invoice.id, 'manual');
       await cancelReminders(invoice.id);

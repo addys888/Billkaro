@@ -204,9 +204,9 @@ export async function markInvoicePaid(
 /**
  * Get invoice by invoice number
  */
-export async function getInvoiceByNumber(invoiceNo: string) {
+export async function getInvoiceByNumber(invoiceNo: string, userId: string) {
   return prisma.invoice.findUnique({
-    where: { invoiceNo },
+    where: { userId_invoiceNo: { userId, invoiceNo } },
     include: { client: true, user: true },
   });
 }
