@@ -8,6 +8,7 @@ import { formatCurrency } from '../../utils/currency';
 import { formatDateShort, addDays } from '../../utils/dates';
 import { generateUPILink } from '../../utils/upi';
 import { formatBankDetails } from '../../services/payment.service';
+import { PrismaClient } from '@prisma/client';
 import { config } from '../../config';
 import { logger } from '../../utils/logger';
 
@@ -239,11 +240,20 @@ async function confirmAndSendInvoice(
       },
     });
 
+    const prisma = new PrismaClient();
+    const freshUser = await prisma.user.findUnique({ where: { id: user.id } });
+
+    // Build clean success message with UPI ID (not raw upi:// link)
+    const upiLine = freshUser?.upiId
+      ? `📲 *Pay via UPI:* ${freshUser.upiId}`
+      : '';
+
     const successMsg = [
       `✅ *Invoice #${result.invoiceNo} Created!*`,
       '',
       `💵 Total: ${formatCurrency(result.totalAmount)}`,
-      result.paymentLink ? `📲 UPI Pay: ${result.paymentLink}` : '',
+      upiLine,
+      result.pdfUrl ? '📎 PDF invoice attached below' : '',
       '',
       '━━━━━━━━━━━━━━━━━━',
       '👉 *Forward this to your client?*',
@@ -257,6 +267,21 @@ async function confirmAndSendInvoice(
         { id: 'cancel_invoice', title: '📋 Done' },
       ],
     });
+
+    // Send PDF as document attachment if generated
+    if (result.pdfUrl) {
+      try {
+        await sendMediaMessage({
+          to: phone,
+          type: 'document',
+          mediaUrl: `${config.APP_URL}${result.pdfUrl}`,
+          caption: `Invoice #${result.invoiceNo} - ${formatCurrency(result.totalAmount)}`,
+          filename: `${result.invoiceNo}.pdf`,
+        });
+      } catch (pdfError) {
+        logger.warn('Failed to send PDF to merchant', { invoiceNo: result.invoiceNo, error: pdfError });
+      }
+    }
   } catch (error) {
     logger.error('Invoice creation failed', { phone, error });
     await sendTextMessage({
