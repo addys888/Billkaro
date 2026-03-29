@@ -1,3 +1,4 @@
+import { prisma } from '../../db/prisma';
 import { PrismaClient, User, InvoiceStatus } from '@prisma/client';
 import { sendTextMessage, sendButtonMessage } from '../../services/whatsapp.service';
 import { markInvoicePaid, getInvoiceByNumber } from '../../services/invoice.service';
@@ -6,7 +7,7 @@ import { formatCurrency } from '../../utils/currency';
 import { BOT_COMMANDS } from '../../config/constants';
 import { logger } from '../../utils/logger';
 
-const prisma = new PrismaClient();
+
 
 /**
  * Handle bot commands (non-invoice messages)

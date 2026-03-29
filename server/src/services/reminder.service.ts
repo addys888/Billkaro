@@ -1,3 +1,4 @@
+import { prisma } from '../db/prisma';
 import { Queue, Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { PrismaClient, ReminderType, ReminderStatus, InvoiceStatus } from '@prisma/client';
@@ -8,7 +9,7 @@ import { formatCurrency } from '../utils/currency';
 import { sendTextMessage, sendButtonMessage } from './whatsapp.service';
 import { logger } from '../utils/logger';
 
-const prisma = new PrismaClient();
+
 
 const connection = new IORedis(config.REDIS_URL, {
   maxRetriesPerRequest: null,

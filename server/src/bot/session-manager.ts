@@ -1,8 +1,9 @@
+import { prisma } from '../db/prisma';
 import { PrismaClient } from '@prisma/client';
 import IORedis from 'ioredis';
 import { config } from '../config';
 
-const prisma = new PrismaClient();
+
 const redis = new IORedis(config.REDIS_URL);
 
 const SESSION_TTL = 60 * 30; // 30 minutes

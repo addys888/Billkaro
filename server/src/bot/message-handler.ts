@@ -1,3 +1,4 @@
+import { prisma } from '../db/prisma';
 import { PrismaClient } from '@prisma/client';
 import { sendTextMessage, sendButtonMessage, downloadMedia, markAsRead } from '../services/whatsapp.service';
 import { classifyIntent } from '../services/nlu.service';
@@ -8,7 +9,7 @@ import { handleInvoiceFlow } from './flows/invoice.flow';
 import { handleCommand } from './flows/command.flow';
 import { logger } from '../utils/logger';
 
-const prisma = new PrismaClient();
+
 
 /**
  * Main entry point for all incoming WhatsApp messages

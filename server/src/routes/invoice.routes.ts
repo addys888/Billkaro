@@ -1,3 +1,4 @@
+import { prisma } from '../db/prisma';
 import { Router, Response } from 'express';
 import { PrismaClient, InvoiceStatus } from '@prisma/client';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
@@ -9,7 +10,7 @@ import { config } from '../config';
 import { logger } from '../utils/logger';
 
 const router = Router();
-const prisma = new PrismaClient();
+
 
 router.use(authMiddleware);
 
@@ -78,7 +79,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const invoice = await prisma.invoice.findFirst({
-      where: { id: req.params.id, userId: req.userId },
+      where: { id: req.params.id as string, userId: req.userId! },
       include: { client: true },
     });
 
@@ -106,7 +107,7 @@ router.patch('/:id/mark-paid', async (req: AuthRequest, res: Response) => {
     const { paymentMethod = 'manual', notes } = req.body;
 
     const invoice = await prisma.invoice.findFirst({
-      where: { id: req.params.id, userId: req.userId },
+      where: { id: req.params.id as string, userId: req.userId! },
     });
 
     if (!invoice) {
@@ -133,7 +134,7 @@ router.patch('/:id/mark-paid', async (req: AuthRequest, res: Response) => {
 router.post('/:id/resend', async (req: AuthRequest, res: Response) => {
   try {
     const invoice = await prisma.invoice.findFirst({
-      where: { id: req.params.id, userId: req.userId },
+      where: { id: req.params.id as string, userId: req.userId! },
       include: { client: true, user: true },
     });
 

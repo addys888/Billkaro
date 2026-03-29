@@ -1,8 +1,9 @@
+import { prisma } from '../db/prisma';
 import { PrismaClient } from '@prisma/client';
 import { config } from '../config';
 import { getCurrentFinancialYear } from './dates';
 
-const prisma = new PrismaClient();
+
 
 /**
  * Generate the next sequential invoice number for a user

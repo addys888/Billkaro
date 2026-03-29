@@ -1,10 +1,11 @@
+import { prisma } from '../../db/prisma';
 import { PrismaClient, User } from '@prisma/client';
 import { sendTextMessage, sendButtonMessage } from '../../services/whatsapp.service';
 import { updateSession, clearSession } from '../session-manager';
 import { ONBOARDING_STEPS } from '../../config/constants';
 import { logger } from '../../utils/logger';
 
-const prisma = new PrismaClient();
+
 
 /**
  * Handle onboarding flow for new users

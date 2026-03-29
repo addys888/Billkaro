@@ -1,6 +1,7 @@
+import { prisma } from '../db/prisma';
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+
 
 /**
  * Get all clients for a user with invoice stats

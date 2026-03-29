@@ -26,7 +26,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 // ── Get Client Detail ─────────────────────────────────────
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const client = await getClientDetail(req.userId!, req.params.id);
+    const client = await getClientDetail(req.userId!, req.params.id as string);
     if (!client) {
       res.status(404).json({ success: false, error: 'Client not found' });
       return;
@@ -42,7 +42,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 router.patch('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { name, phone, gstin, email } = req.body;
-    const updated = await updateClient(req.userId!, req.params.id, {
+    const updated = await updateClient(req.userId!, req.params.id as string, {
       name, phone, gstin, email,
     });
     res.json({ success: true, client: updated });

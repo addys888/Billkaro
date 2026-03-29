@@ -27,7 +27,7 @@ export async function transcribeVoiceNote(audioBuffer: Buffer, mimeType: string 
       prompt: 'This is an invoice or billing request. Common words: bill, invoice, paisa, rupees, hazaar, lakh, install, repair, service, payment.',
     });
 
-    const text = typeof transcription === 'string' ? transcription : transcription.toString();
+    const text = typeof transcription === 'string' ? transcription : String(transcription);
 
     if (!text || text.trim().length === 0) {
       logger.warn('Whisper returned empty transcription');

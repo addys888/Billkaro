@@ -1,3 +1,4 @@
+import { prisma } from '../db/prisma';
 import { PrismaClient, InvoiceStatus } from '@prisma/client';
 import { generateInvoiceNumber } from '../utils/invoice-number';
 import { calculateDueDate } from '../utils/dates';
@@ -7,7 +8,7 @@ import { generateUPILink } from '../utils/upi';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 
-const prisma = new PrismaClient();
+
 
 interface CreateInvoiceParams {
   userId: string;
@@ -48,11 +49,14 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
   const totalAmount = subtotal + gstAmount;
 
   // Generate invoice number
+  console.log('step 1', new Date());
   const invoiceNo = await generateInvoiceNumber(userId);
+  console.log('step 2', new Date());
 
   // Calculate due date
   const paymentTerms = dueDays || user.defaultPaymentTermsDays;
   const dueDate = calculateDueDate(new Date(), paymentTerms);
+  console.log('step 3', new Date());
 
   // Prepare line items with amounts
   const lineItems = items.map((item) => ({
@@ -60,21 +64,26 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
     amount: item.quantity * item.rate,
   }));
 
+  console.log('step 4', new Date());
+  
+  const createData = {
+    userId,
+    clientId: client.id,
+    invoiceNo,
+    subtotal,
+    gstRate,
+    gstAmount,
+    totalAmount,
+    description: items.map((i) => i.name).join(', '),
+    lineItems: lineItems as any,
+    notes,
+    dueDate,
+  };
+  console.log('Data to create:', JSON.stringify(createData, null, 2));
+
   // Create invoice record
   const invoice = await prisma.invoice.create({
-    data: {
-      userId,
-      clientId: client.id,
-      invoiceNo,
-      subtotal,
-      gstRate,
-      gstAmount,
-      totalAmount,
-      description: items.map((i) => i.name).join(', '),
-      lineItems: lineItems as any,
-      notes,
-      dueDate,
-    },
+    data: createData,
   });
 
   // Generate PDF
@@ -95,7 +104,7 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
       bankName: user.bankName || undefined,
       clientName: client.name,
       clientPhone: client.phone || undefined,
-      clientGstin: client.gstin || undefined,
+      clientGstin: (client as any).gstin || undefined,
       lineItems,
       subtotal,
       gstRate,

@@ -1,3 +1,4 @@
+import { prisma } from '../../db/prisma';
 import { User } from '@prisma/client';
 import { sendTextMessage, sendButtonMessage, sendMediaMessage } from '../../services/whatsapp.service';
 import { parseInvoiceFromText, ParsedInvoice } from '../../services/nlu.service';
@@ -240,7 +241,6 @@ async function confirmAndSendInvoice(
       },
     });
 
-    const prisma = new PrismaClient();
     const freshUser = await prisma.user.findUnique({ where: { id: user.id } });
 
     // Build clean success message with UPI ID (not raw upi:// link)

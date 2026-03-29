@@ -1,3 +1,4 @@
+import { prisma } from '../db/prisma';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -5,7 +6,7 @@ import { config } from '../config';
 import { sendTextMessage } from './whatsapp.service';
 import { logger } from '../utils/logger';
 
-const prisma = new PrismaClient();
+
 
 /**
  * Generate and send OTP via WhatsApp
