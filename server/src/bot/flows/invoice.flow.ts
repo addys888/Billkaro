@@ -283,6 +283,8 @@ async function confirmAndSendInvoice(
       }
     }
   } catch (error: any) {
+    console.error('------- INVOICE CREATION TRUE ERROR -------');
+    console.error(error);
     logger.error('Invoice creation failed', { 
       phone, 
       errorMessage: error?.message,

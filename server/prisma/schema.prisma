@@ -63,7 +63,7 @@ model Invoice {
   id                     String    @id @default(uuid())
   userId                 String    @map("user_id")
   clientId               String    @map("client_id")
-  invoiceNo              String    @unique @map("invoice_no")
+  invoiceNo              String    @map("invoice_no")
   status                 InvoiceStatus @default(PENDING)
   subtotal               Decimal   @db.Decimal(12, 2)
   gstRate                Decimal   @default(18) @map("gst_rate") @db.Decimal(4, 2)
@@ -87,6 +87,7 @@ model Invoice {
   client                 Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
   reminders              Reminder[]
 
+  @@unique([userId, invoiceNo])
   @@index([userId])
   @@index([clientId])
   @@index([status])
