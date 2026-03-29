@@ -171,13 +171,21 @@ async function callWhatsAppAPI(
     const data = await response.json();
 
     if (!response.ok) {
-      logger.error('WhatsApp API error', { status: response.status, data });
-      throw new Error(`WhatsApp API error: ${JSON.stringify(data)}`);
+      logger.error('WhatsApp API error', {
+        status: response.status,
+        url,
+        errorData: JSON.stringify(data),
+        body: body ? JSON.stringify(body) : null
+      });
+      throw new Error(`WhatsApp API error (${response.status}): ${JSON.stringify(data)}`);
     }
 
     return data;
-  } catch (error) {
-    logger.error('WhatsApp API call failed', { endpoint, error });
+  } catch (error: any) {
+    logger.error('WhatsApp API call failed', {
+      endpoint,
+      errorMessage: error?.message
+    });
     throw error;
   }
 }

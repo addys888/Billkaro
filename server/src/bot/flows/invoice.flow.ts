@@ -282,8 +282,12 @@ async function confirmAndSendInvoice(
         logger.warn('Failed to send PDF to merchant', { invoiceNo: result.invoiceNo, error: pdfError });
       }
     }
-  } catch (error) {
-    logger.error('Invoice creation failed', { phone, error });
+  } catch (error: any) {
+    logger.error('Invoice creation failed', { 
+      phone, 
+      errorMessage: error?.message,
+      errorStack: error?.stack,
+    });
     await sendTextMessage({
       to: phone,
       text: '❌ Failed to create invoice. Please try again.',
