@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
+import rateLimit from 'express-rate-limit';
 import { config } from './config';
 import { logger } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
@@ -18,14 +19,30 @@ const app = express();
 
 // ── Security & Parsing ────────────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false }));
+
+// CORS: Allow dashboard origin (production + dev)
+const allowedOrigins = [config.DASHBOARD_URL];
+if (config.NODE_ENV !== 'production') {
+  allowedOrigins.push('http://localhost:3000');
+}
 app.use(cors({
-  origin: [config.DASHBOARD_URL, 'http://localhost:3000'],
+  origin: allowedOrigins,
   credentials: true,
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ── Static Files (PDF invoices for MVP) ───────────────────
+// ── Rate Limiting ─────────────────────────────────────────
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // 5 OTP requests per minute per IP
+  message: { success: false, error: 'Too many OTP requests. Please wait a minute.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// ── Static Files (PDF invoices — dev only, R2 in production) ─
 app.use('/invoices', express.static(path.join(__dirname, '..', 'tmp', 'invoices')));
 
 // ── Health Check ──────────────────────────────────────────
@@ -35,12 +52,13 @@ app.get('/health', (_req, res) => {
     service: 'billkaro-api',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    environment: config.NODE_ENV,
   });
 });
 
 // ── API Routes ────────────────────────────────────────────
 app.use('/webhook', webhookRoutes);
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/dashboard', dashboardRoutes);

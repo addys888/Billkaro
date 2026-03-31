@@ -28,21 +28,36 @@ export async function handleIncomingMessage(message: any, senderPhone: string): 
       text = message.text?.body || '';
     } else if (message.type === 'audio') {
       // Voice note → transcribe
-      const audioBuffer = await downloadMedia(message.audio.id);
-      const transcribed = await transcribeVoiceNote(audioBuffer, message.audio.mime_type);
-      if (!transcribed) {
+      try {
+        logger.info('Voice note received, downloading media', { mediaId: message.audio.id, mimeType: message.audio.mime_type });
+        const audioBuffer = await downloadMedia(message.audio.id);
+        logger.info('Media downloaded, transcribing', { bufferSize: audioBuffer.length });
+        const transcribed = await transcribeVoiceNote(audioBuffer, message.audio.mime_type);
+        if (!transcribed) {
+          await sendTextMessage({
+            to: senderPhone,
+            text: '❌ Sorry, I couldn\'t understand the voice note. Please try again or type your message.',
+          });
+          return;
+        }
+        text = transcribed;
+        // Confirm transcription
         await sendTextMessage({
           to: senderPhone,
-          text: '❌ Sorry, I couldn\'t understand the voice note. Please try again or type your message.',
+          text: `🎤 I heard: "${text}"`,
+        });
+      } catch (voiceError: any) {
+        logger.error('Voice note processing failed', { 
+          mediaId: message.audio.id,
+          errorMessage: voiceError?.message,
+          errorStack: voiceError?.stack,
+        });
+        await sendTextMessage({
+          to: senderPhone,
+          text: '❌ Could not process your voice note. Please try sending a text message instead.\n\nExample: "Bill 5000 to Rahul for AC repair"',
         });
         return;
       }
-      text = transcribed;
-      // Confirm transcription
-      await sendTextMessage({
-        to: senderPhone,
-        text: `🎤 I heard: "${text}"`,
-      });
     } else if (message.type === 'interactive') {
       // Button reply
       const buttonId = message.interactive?.button_reply?.id;
@@ -141,8 +156,8 @@ async function handleInteractiveReply(phone: string, buttonId: string): Promise<
       await handleCommand(phone, buttonId, user);
       break;
     default:
-      // Check onboarding buttons
-      if (buttonId.startsWith('terms_')) {
+      // Check onboarding buttons (terms_7, terms_15, terms_30, bank_yes, bank_skip)
+      if (buttonId.startsWith('terms_') || buttonId.startsWith('bank_')) {
         await handleOnboardingStep(phone, buttonId, user);
       }
       break;

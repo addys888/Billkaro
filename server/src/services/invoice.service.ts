@@ -49,14 +49,11 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
   const totalAmount = subtotal + gstAmount;
 
   // Generate invoice number
-  console.log('step 1', new Date());
   const invoiceNo = await generateInvoiceNumber(userId);
-  console.log('step 2', new Date());
 
   // Calculate due date
   const paymentTerms = dueDays || user.defaultPaymentTermsDays;
   const dueDate = calculateDueDate(new Date(), paymentTerms);
-  console.log('step 3', new Date());
 
   // Prepare line items with amounts
   const lineItems = items.map((item) => ({
@@ -64,26 +61,21 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
     amount: item.quantity * item.rate,
   }));
 
-  console.log('step 4', new Date());
-  
-  const createData = {
-    userId,
-    clientId: client.id,
-    invoiceNo,
-    subtotal,
-    gstRate,
-    gstAmount,
-    totalAmount,
-    description: items.map((i) => i.name).join(', '),
-    lineItems: lineItems as any,
-    notes,
-    dueDate,
-  };
-  console.log('Data to create:', JSON.stringify(createData, null, 2));
-
   // Create invoice record
   const invoice = await prisma.invoice.create({
-    data: createData,
+    data: {
+      userId,
+      clientId: client.id,
+      invoiceNo,
+      subtotal,
+      gstRate,
+      gstAmount,
+      totalAmount,
+      description: items.map((i) => i.name).join(', '),
+      lineItems: lineItems as any,
+      notes,
+      dueDate,
+    },
   });
 
   // Generate PDF

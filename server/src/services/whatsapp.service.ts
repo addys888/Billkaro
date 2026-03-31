@@ -133,6 +133,52 @@ export async function downloadMedia(mediaId: string): Promise<Buffer> {
 }
 
 /**
+ * Upload media (PDF, image) to WhatsApp servers and get a media ID
+ * This is needed because WhatsApp can't download from localhost URLs
+ */
+export async function uploadMedia(
+  buffer: Buffer,
+  filename: string,
+  mimeType: string
+): Promise<string> {
+  const formData = new FormData();
+  formData.append('messaging_product', 'whatsapp');
+  formData.append('type', mimeType);
+  formData.append('file', new Blob([buffer], { type: mimeType }), filename);
+
+  const url = `${WA_API_BASE}/media`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.WHATSAPP_ACCESS_TOKEN}`,
+      },
+      body: formData,
+    });
+
+    const data = await response.json() as any;
+
+    if (!response.ok) {
+      logger.error('WhatsApp media upload failed', {
+        status: response.status,
+        errorData: JSON.stringify(data),
+      });
+      throw new Error(`Media upload failed (${response.status}): ${JSON.stringify(data)}`);
+    }
+
+    logger.info('Media uploaded to WhatsApp', { mediaId: data.id, filename });
+    return data.id;
+  } catch (error: any) {
+    logger.error('WhatsApp media upload error', {
+      filename,
+      errorMessage: error?.message,
+    });
+    throw error;
+  }
+}
+
+/**
  * Mark a message as read
  */
 export async function markAsRead(messageId: string): Promise<void> {

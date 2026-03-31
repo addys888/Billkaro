@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>BillKaro — WhatsApp-First Smart Invoicing | Sales Pitch Deck</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#060A06;color:#E8E8F0;font-family:'Inter',sans-serif;overflow:hidden;height:100vh;height:100dvh;width:100vw}
+    .deck{position:relative;width:100vw;height:100vh;height:100dvh;overflow:hidden}
+    .slide{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:40px 40px 90px;opacity:0;transform:translateY(30px);transition:opacity .5s ease,transform .5s ease;pointer-events:none;overflow-y:auto;-webkit-overflow-scrolling:touch}
+    .slide>*:first-child{margin-top:auto}.slide>*:last-child{margin-bottom:auto}
+    .slide.active{opacity:1;transform:translateY(0);pointer-events:auto;z-index:10}
+    .nav-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(6,10,6,.97);backdrop-filter:blur(16px);border-top:1px solid #1E2E1E;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;z-index:100;gap:8px}
+    .nav-btn{background:none;border:1px solid #2A3E2A;color:#6B8F6B;padding:10px 20px;border-radius:10px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;min-width:80px;text-align:center}
+    .nav-btn:hover{border-color:#25D366;color:#25D366;background:rgba(37,211,102,.05)}
+    .nav-btn.primary{background:#25D366;color:#000;border-color:#25D366;font-weight:700}
+    .nav-btn.primary:hover{background:#00e676}
+    .nav-center{display:flex;align-items:center;gap:12px;flex:1;justify-content:center}
+    .nav-dots{display:flex;gap:5px;flex-wrap:wrap;justify-content:center}
+    .nav-dot{width:8px;height:8px;border-radius:50%;background:#1E3A1E;cursor:pointer;transition:all .3s}
+    .nav-dot.active{background:#25D366;width:20px;border-radius:4px}
+    .slide-counter{font-size:12px;color:#5A7A5A;font-weight:700;letter-spacing:.5px;white-space:nowrap}
+    .mega{font-size:clamp(28px,4.5vw,52px);font-weight:900;line-height:1.1;letter-spacing:-1px}
+    .big{font-size:clamp(22px,3.2vw,36px);font-weight:800;line-height:1.2;letter-spacing:-.5px}
+    .mid{font-size:clamp(15px,1.8vw,20px);font-weight:700;line-height:1.4}
+    .body{font-size:clamp(12px,1.1vw,14px);color:#6B8F6B;line-height:1.8}
+    .label{font-size:11px;text-transform:uppercase;letter-spacing:2px;font-weight:700}
+    .green{color:#25D366}.emerald{color:#00e676}.amber{color:#ffab40}.blue{color:#64b5f6}.purple{color:#a855f7}.red{color:#ff5252}.white{color:#E8E8F0}
+    .pill{display:inline-block;padding:4px 12px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.3px}
+    .pill-green{background:rgba(37,211,102,.12);color:#25D366;border:1px solid rgba(37,211,102,.25)}
+    .pill-amber{background:rgba(255,171,64,.12);color:#ffab40;border:1px solid rgba(255,171,64,.25)}
+    .pill-purple{background:rgba(168,85,247,.12);color:#a855f7;border:1px solid rgba(168,85,247,.25)}
+    .pill-blue{background:rgba(100,181,246,.12);color:#64b5f6;border:1px solid rgba(100,181,246,.25)}
+    .pill-red{background:rgba(255,82,82,.12);color:#ff5252;border:1px solid rgba(255,82,82,.25)}
+    .card{background:#0D150D;border:1px solid #1E2E1E;border-radius:14px;padding:24px}
+    .card-sm{background:#0D150D;border:1px solid #1E2E1E;border-radius:12px;padding:16px;transition:all .3s}
+    .card-sm:hover{border-color:rgba(37,211,102,.35);transform:translateY(-2px)}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+    .stat-box{text-align:center;padding:18px 14px;background:#0A120A;border:1px solid #162016;border-radius:12px}
+    .stat-val{font-size:clamp(22px,2.8vw,32px);font-weight:900;margin-bottom:4px;font-variant-numeric:tabular-nums}
+    .stat-lbl{font-size:10px;color:#3A5A3A;text-transform:uppercase;letter-spacing:.5px;line-height:1.4}
+    .feature-card{background:#0A120A;border:1px solid #162016;border-radius:12px;padding:16px;text-align:center;transition:all .3s}
+    .feature-card:hover{border-color:rgba(37,211,102,.3);transform:translateY(-2px)}
+    .feature-icon{font-size:24px;margin-bottom:8px}
+    .feature-title{font-size:12px;font-weight:800;color:#E8E8F0;margin-bottom:3px}
+    .feature-desc{font-size:10px;color:#5A7A5A;line-height:1.4}
+    .step-circle{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;flex-shrink:0;margin-bottom:10px}
+    .step-circle.g{background:rgba(37,211,102,.15);color:#25D366;border:2px solid rgba(37,211,102,.3)}
+    .step-circle.b{background:rgba(100,181,246,.15);color:#64b5f6;border:2px solid rgba(100,181,246,.3)}
+    .step-circle.p{background:rgba(168,85,247,.15);color:#a855f7;border:2px solid rgba(168,85,247,.3)}
+    .pain-item{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-bottom:1px solid #141E14}
+    .pain-item:last-child{border-bottom:none}
+    .pain-icon{font-size:22px;flex-shrink:0}
+    .pain-title{font-size:13px;font-weight:700;color:#ff5252;margin-bottom:3px}
+    .pain-desc{font-size:11px;color:#5A7A5A;line-height:1.6}
+    .save-row{display:flex;align-items:center;gap:14px;padding:14px 18px;background:#0A120A;border:1px solid #162016;border-radius:12px}
+    .save-icon{font-size:20px;flex-shrink:0}.save-info{flex:1}
+    .save-task{font-size:12px;font-weight:600;color:#E8E8F0;margin-bottom:2px}
+    .save-detail{font-size:10px;color:#5A7A5A}
+    .save-time{text-align:right;white-space:nowrap}
+    .save-mins{font-size:18px;font-weight:900;color:#25D366;font-variant-numeric:tabular-nums}
+    .save-label{font-size:9px;color:#3A5A3A;text-transform:uppercase}
+    .price-card{background:#0D150D;border:1px solid #1E2E1E;border-radius:16px;padding:28px 20px;text-align:center;transition:all .3s;position:relative}
+    .price-card.featured{border-color:rgba(37,211,102,.4);box-shadow:0 0 30px rgba(37,211,102,.08)}
+    .price-badge{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:#25D366;color:#000;font-size:9px;font-weight:800;padding:4px 14px;border-radius:99px;letter-spacing:.5px}
+    .price-name{font-size:16px;font-weight:800;margin-bottom:6px}
+    .price-amount{font-size:32px;font-weight:900;margin-bottom:4px;font-variant-numeric:tabular-nums}
+    .price-period{font-size:11px;color:#3A5A3A;margin-bottom:18px}
+    .price-features{text-align:left;display:flex;flex-direction:column;gap:7px;margin-bottom:20px}
+    .price-feat{font-size:11px;color:#6B8F6B;display:flex;gap:8px;align-items:flex-start}
+    .price-feat::before{content:'✓';color:#25D366;font-weight:700;flex-shrink:0}
+    .price-btn{width:100%;padding:11px;border:none;border-radius:10px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s}
+    .price-btn.primary{background:#25D366;color:#000}
+    .price-btn.ghost{background:#1E2E1E;color:#5A7A5A;border:1px solid #1E3A1E}
+    .cta-card{background:linear-gradient(135deg,rgba(37,211,102,.06),rgba(18,140,126,.06));border:1px solid rgba(37,211,102,.3);border-radius:18px;padding:36px 28px;text-align:center;max-width:550px;width:100%}
+    .screen-img{max-width:100%;border-radius:14px;border:1px solid #1E2E1E;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    .anim-float{animation:float 4s ease-in-out infinite}
+    @media(max-width:768px){
+      .slide{padding:24px 18px 85px}
+      .grid-2{grid-template-columns:1fr}.grid-3{grid-template-columns:1fr 1fr}
+      .feature-grid-5{grid-template-columns:repeat(3,1fr)!important}
+      .nav-btn{padding:8px 14px;font-size:12px;min-width:60px}
+      .nav-dots{display:none}
+      .pain-item{flex-direction:column;gap:8px}
+      .save-row{flex-direction:column;text-align:center;gap:8px}
+      .save-time{text-align:center}
+      .step-flow{flex-direction:column!important}
+      .arrow-hide{display:none!important}
+      .wa-section{flex-direction:column!important}
+      .screen-img{max-width:90%}
+    }
+    @media(max-width:480px){.grid-3{grid-template-columns:1fr}.feature-grid-5{grid-template-columns:1fr 1fr!important}.price-grid{grid-template-columns:1fr!important}.stat-flex{flex-direction:column!important}}
+  </style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+  <!-- SLIDE 1: COVER -->
+  <div class="slide active" id="slide-0">
+    <div style="width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg,#128C7E,#25D366);display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:20px;box-shadow:0 0 30px rgba(37,211,102,.25)">🧾</div>
+    <div class="pill pill-green" style="margin-bottom:18px">BILLKARO BY ZENTILY</div>
+    <div class="mega white" style="text-align:center;margin-bottom:10px">WhatsApp pe Bill Banao<br>Paisa Apne Aap Pao</div>
+    <div class="body" style="text-align:center;max-width:480px;margin-bottom:28px">Indian SMEs lose <strong style="color:#ff5252">₹2.8 lakh/year</strong> in uncollected payments.<br>BillKaro turns WhatsApp into your invoicing + collection machine — <strong style="color:#25D366">zero app downloads</strong>.</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:24px">
+      <div class="pill pill-green">🧾 Voice/Text Invoicing</div>
+      <div class="pill pill-purple">🤖 AI-Powered NLU</div>
+      <div class="pill pill-amber">⏰ Auto Payment Chasers</div>
+      <div class="pill pill-blue">💰 Zero MDR Payments</div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center" class="stat-flex">
+      <div class="stat-box" style="min-width:100px"><div class="stat-val green">10 sec</div><div class="stat-lbl">Invoice Created</div></div>
+      <div class="stat-box" style="min-width:100px"><div class="stat-val amber">₹0</div><div class="stat-lbl">Transaction Fee</div></div>
+      <div class="stat-box" style="min-width:100px"><div class="stat-val blue">0</div><div class="stat-lbl">App Downloads</div></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 2: THE PROBLEM -->
+  <div class="slide" id="slide-1">
+    <div class="label red" style="margin-bottom:14px">THE PROBLEM</div>
+    <div class="big white" style="text-align:center;margin-bottom:6px">Indian SMEs are bleeding money</div>
+    <div class="body" style="text-align:center;margin-bottom:28px;max-width:480px"><strong style="color:#ff5252">68% of Indian SMEs</strong> struggle with late payments. Manual invoicing costs time, money, and relationships.</div>
+    <div style="max-width:560px;width:100%">
+      <div class="pain-item"><div class="pain-icon">📝</div><div><div class="pain-title">45 min/invoice — Manual bill creation</div><div class="pain-desc">Open Word/Excel → type details → calculate GST → convert to PDF → send on WhatsApp. For 5 invoices/day, that's 4 hours wasted.</div></div></div>
+      <div class="pain-item"><div class="pain-icon">😰</div><div><div class="pain-title">₹2.8L/year — Uncollected payments</div><div class="pain-desc">Average Indian SME has ₹2.8 lakh stuck in unpaid invoices because owners hate asking for money repeatedly.</div></div></div>
+      <div class="pain-item"><div class="pain-icon">📵</div><div><div class="pain-title">No system — Forgotten follow-ups</div><div class="pain-desc">"Kal phone karunga" — but tomorrow, there's new work. Old invoices pile up. No reminders, no tracking.</div></div></div>
+      <div class="pain-item"><div class="pain-icon">💸</div><div><div class="pain-title">2-3% — Payment gateway fees</div><div class="pain-desc">Razorpay, PayU charge 2-3% per transaction. On ₹10L monthly billing, that's ₹20-30K gone in fees alone.</div></div></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 3: WHAT YOU SAVE -->
+  <div class="slide" id="slide-2">
+    <div class="label green" style="margin-bottom:14px">WHAT YOU SAVE</div>
+    <div class="big white" style="text-align:center;margin-bottom:6px">Get paid faster. Save hours daily.</div>
+    <div class="body" style="text-align:center;margin-bottom:24px;max-width:480px">Real numbers from BillKaro's automated workflow:</div>
+    <div style="max-width:560px;width:100%;display:flex;flex-direction:column;gap:10px;margin-bottom:24px">
+      <div class="save-row"><div class="save-icon">🧾</div><div class="save-info"><div class="save-task">Voice/text → PDF invoice in 10 seconds</div><div class="save-detail">No typing, no templates. Just say "Bill 5000 to Rahul for AC repair"</div></div><div class="save-time"><div class="save-mins">40 min</div><div class="save-label">Saved/day</div></div></div>
+      <div class="save-row"><div class="save-icon">🤖</div><div class="save-info"><div class="save-task">Auto payment reminders chase money for you</div><div class="save-detail">Polite, scheduled follow-ups at Day 0, D+3, D+7, D+15. You never ask again.</div></div><div class="save-time"><div class="save-mins">₹2.8L</div><div class="save-label">Recovered/yr</div></div></div>
+      <div class="save-row"><div class="save-icon">💰</div><div class="save-info"><div class="save-task">Zero MDR — Direct UPI payments</div><div class="save-detail">Clients pay directly to your UPI/bank. No gateway fee. Every rupee is yours.</div></div><div class="save-time"><div class="save-mins">₹0</div><div class="save-label">Transaction fee</div></div></div>
+    </div>
+    <div class="card" style="max-width:560px;width:100%;text-align:center">
+      <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
+        <div><div style="font-size:28px;font-weight:900;color:#25D366">40 min</div><div style="font-size:10px;color:#3A5A3A;text-transform:uppercase">Saved per day</div></div>
+        <div style="width:1px;background:#1E2E1E"></div>
+        <div><div style="font-size:28px;font-weight:900;color:#ffab40">65%</div><div style="font-size:10px;color:#3A5A3A;text-transform:uppercase">Faster collections</div></div>
+        <div style="width:1px;background:#1E2E1E"></div>
+        <div><div style="font-size:28px;font-weight:900;color:#ff5252">₹0</div><div style="font-size:10px;color:#3A5A3A;text-transform:uppercase">MDR / Gateway Fee</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 4: THE SOLUTION -->
+  <div class="slide" id="slide-3">
+    <div class="label green" style="margin-bottom:14px">THE SOLUTION</div>
+    <div class="big white" style="text-align:center;margin-bottom:6px">Meet BillKaro</div>
+    <div class="body" style="text-align:center;margin-bottom:28px;max-width:480px">WhatsApp-first invoicing & collections for Indian SMEs. Say it → Bill it → Get paid. No app. No learning curve.</div>
+    <div class="grid-3" style="max-width:650px;width:100%">
+      <div class="card-sm" style="text-align:center"><div style="font-size:32px;margin-bottom:10px">💬</div><div class="mid white" style="margin-bottom:5px">WhatsApp Native</div><div class="body" style="font-size:11px">No app download. Works on any phone. Just send a WhatsApp message.</div></div>
+      <div class="card-sm" style="text-align:center"><div style="font-size:32px;margin-bottom:10px">🎤</div><div class="mid white" style="margin-bottom:5px">Voice → Invoice</div><div class="body" style="font-size:11px">Send a voice note in Hindi/English. AI transcribes and creates the invoice.</div></div>
+      <div class="card-sm" style="text-align:center"><div style="font-size:32px;margin-bottom:10px">⏰</div><div class="mid white" style="margin-bottom:5px">Auto Chasers</div><div class="body" style="font-size:11px">Never ask for money again. BillKaro sends polite reminders automatically.</div></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 5: HOW IT WORKS -->
+  <div class="slide" id="slide-4">
+    <div class="label green" style="margin-bottom:14px">HOW IT WORKS</div>
+    <div class="big white" style="text-align:center;margin-bottom:28px">Three steps. Ten seconds.</div>
+    <div style="display:flex;gap:20px;align-items:flex-start;max-width:750px;width:100%;flex-wrap:wrap;justify-content:center" class="step-flow">
+      <div style="flex:1;min-width:180px;text-align:center">
+        <div class="step-circle g" style="margin:0 auto 10px">1</div>
+        <div class="mid white" style="margin-bottom:6px">Say or Type</div>
+        <div class="body" style="font-size:11px">"Bill 5000 to Rahul for AC repair" — text or voice note in Hindi/English/Hinglish.</div>
+        <div style="margin-top:10px;display:flex;gap:4px;justify-content:center;flex-wrap:wrap">
+          <span class="pill pill-green" style="font-size:9px">💬 Text</span>
+          <span class="pill pill-blue" style="font-size:9px">🎤 Voice</span>
+          <span class="pill pill-amber" style="font-size:9px">🇮🇳 Hinglish</span>
+        </div>
+      </div>
+      <div style="font-size:28px;color:#1E3A1E;padding-top:16px" class="arrow-hide">→</div>
+      <div style="flex:1;min-width:180px;text-align:center">
+        <div class="step-circle b" style="margin:0 auto 10px">2</div>
+        <div class="mid white" style="margin-bottom:6px">Confirm</div>
+        <div class="body" style="font-size:11px">AI parses amount, client, items, GST. Review the preview → tap ✅ Send Invoice.</div>
+        <div style="margin-top:10px;display:flex;gap:4px;justify-content:center;flex-wrap:wrap">
+          <span class="pill pill-green" style="font-size:9px">✅ Send</span>
+          <span class="pill pill-amber" style="font-size:9px">✏️ Edit</span>
+          <span class="pill pill-red" style="font-size:9px">❌ Cancel</span>
+        </div>
+      </div>
+      <div style="font-size:28px;color:#1E3A1E;padding-top:16px" class="arrow-hide">→</div>
+      <div style="flex:1;min-width:180px;text-align:center">
+        <div class="step-circle p" style="margin:0 auto 10px">3</div>
+        <div class="mid white" style="margin-bottom:6px">Get Paid</div>
+        <div class="body" style="font-size:11px">PDF + UPI link sent to you & client. Auto-reminders chase the payment.</div>
+        <div style="margin-top:10px;display:flex;gap:4px;justify-content:center;flex-wrap:wrap">
+          <span class="pill pill-green" style="font-size:9px">📎 PDF</span>
+          <span class="pill pill-blue" style="font-size:9px">💳 UPI</span>
+          <span class="pill pill-purple" style="font-size:9px">⏰ Reminders</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 6: LIVE DEMO — TEXT INVOICE -->
+  <div class="slide" id="slide-5">
+    <div class="label green" style="margin-bottom:14px">LIVE USER STORY</div>
+    <div class="big white" style="text-align:center;margin-bottom:6px">Text → Invoice in 10 seconds</div>
+    <div class="body" style="text-align:center;margin-bottom:20px;max-width:460px">Real WhatsApp conversation: user types one message, gets a GST-compliant PDF invoice with UPI payment link.</div>
+    <img src="pitch-assets/whatsapp-invoice-flow.png" class="screen-img anim-float" style="max-height:52vh;width:auto;object-fit:contain" alt="BillKaro WhatsApp Invoice Flow">
+  </div>
+
+  <!-- SLIDE 7: LIVE DEMO — VOICE NOTE -->
+  <div class="slide" id="slide-6">
+    <div class="label purple" style="margin-bottom:14px">VOICE-FIRST MAGIC</div>
+    <div class="big white" style="text-align:center;margin-bottom:6px">Bol ke bill banao 🎤</div>
+    <div class="body" style="text-align:center;margin-bottom:20px;max-width:460px">Send a 5-second voice note in Hindi. AI transcribes → parses → creates invoice. Your hands never touch a keyboard.</div>
+    <img src="pitch-assets/whatsapp-voice-flow.png" class="screen-img anim-float" style="max-height:52vh;width:auto;object-fit:contain" alt="BillKaro Voice Note to Invoice">
+  </div>
+
+  <!-- SLIDE 8: AUTO REMINDERS -->
+  <div class="slide" id="slide-7">
+    <div class="label amber" style="margin-bottom:14px">AUTOMATED CHASERS</div>
+    <div class="big white" style="text-align:center;margin-bottom:6px">Never ask for money again</div>
+    <div class="body" style="text-align:center;margin-bottom:20px;max-width:460px">BillKaro sends polite, escalating payment reminders to your clients — automatically. You focus on work, we chase the money.</div>
+    <div style="display:flex;gap:24px;max-width:800px;width:100%;align-items:center;justify-content:center;flex-wrap:wrap" class="wa-section">
+      <img src="pitch-assets/auto-reminders.png" class="screen-img" style="max-height:44vh;width:auto;object-fit:contain;max-width:300px" alt="Auto Payment Reminders">
+      <div style="flex:1;min-width:240px">
+        <div class="mid white" style="margin-bottom:14px">4-Step Escalation</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="card-sm" style="padding:10px 14px;border-color:rgba(37,211,102,.2)"><div style="font-size:11px"><span class="green" style="font-weight:800">Day 0</span> — <span style="color:#6B8F6B">Invoice sent with UPI link</span></div></div>
+          <div class="card-sm" style="padding:10px 14px;border-color:rgba(255,171,64,.2)"><div style="font-size:11px"><span class="amber" style="font-weight:800">Due Date</span> — <span style="color:#6B8F6B">Gentle due date reminder</span></div></div>
+          <div class="card-sm" style="padding:10px 14px;border-color:rgba(255,171,64,.2)"><div style="font-size:11px"><span class="amber" style="font-weight:800">D+3 Days</span> — <span style="color:#6B8F6B">Polite follow-up</span></div></div>
+          <div class="card-sm" style="padding:10px 14px;border-color:rgba(255,82,82,.2)"><div style="font-size:11px"><span class="red" style="font-weight:800">D+7 Days</span> — <span style="color:#6B8F6B">Firm reminder</span></div></div>
+          <div class="card-sm" style="padding:10px 14px;border-color:rgba(168,85,247,.2)"><div style="font-size:11px"><span class="purple" style="font-weight:800">D+15 Days</span> — <span style="color:#6B8F6B">Owner escalation alert</span></div></div>
+        </div>
+        <div style="margin-top:12px;font-size:10px;color:#3A5A3A;line-height:1.6">✅ Auto-stops when paid<br>✅ Business hours only (9AM-7PM)<br>✅ Skips Sundays & holidays<br>✅ Owner can pause/resume</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 9: FEATURES -->
+  <div class="slide" id="slide-8">
+    <div class="label green" style="margin-bottom:14px">POWER FEATURES</div>
+    <div class="big white" style="text-align:center;margin-bottom:24px">Everything you need to get paid</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-width:800px;width:100%" class="feature-grid-5">
+      <div class="feature-card"><div class="feature-icon">🧾</div><div class="feature-title">PDF Invoices</div><div class="feature-desc">GST-compliant with QR code</div></div>
+      <div class="feature-card"><div class="feature-icon">🎤</div><div class="feature-title">Voice Notes</div><div class="feature-desc">Hindi/English/Hinglish</div></div>
+      <div class="feature-card"><div class="feature-icon">💳</div><div class="feature-title">UPI Payments</div><div class="feature-desc">Zero MDR, direct to bank</div></div>
+      <div class="feature-card"><div class="feature-icon">⏰</div><div class="feature-title">Auto Chasers</div><div class="feature-desc">4-step payment reminders</div></div>
+      <div class="feature-card"><div class="feature-icon">📊</div><div class="feature-title">Dashboard</div><div class="feature-desc">Track all financials</div></div>
+      <div class="feature-card"><div class="feature-icon">👥</div><div class="feature-title">Client Book</div><div class="feature-desc">Auto-saved client directory</div></div>
+      <div class="feature-card"><div class="feature-icon">🔢</div><div class="feature-title">Auto Numbering</div><div class="feature-desc">Sequential invoice numbers</div></div>
+      <div class="feature-card"><div class="feature-icon">📤</div><div class="feature-title">Client Delivery</div><div class="feature-desc">One-tap send to client</div></div>
+      <div class="feature-card"><div class="feature-icon">🏷️</div><div class="feature-title">GST Auto-Calc</div><div class="feature-desc">Configurable tax rates</div></div>
+      <div class="feature-card"><div class="feature-icon">🔐</div><div class="feature-title">WhatsApp OTP</div><div class="feature-desc">Secure dashboard login</div></div>
+      <div class="feature-card"><div class="feature-icon">📱</div><div class="feature-title">Mobile First</div><div class="feature-desc">Works on any phone</div></div>
+      <div class="feature-card"><div class="feature-icon">🤖</div><div class="feature-title">AI NLU</div><div class="feature-desc">GPT-4o natural language</div></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 10: DASHBOARD -->
+  <div class="slide" id="slide-9">
+    <div class="label purple" style="margin-bottom:14px">OWNER DASHBOARD</div>
+    <div class="big white" style="text-align:center;margin-bottom:6px">Bird's-eye view of your business</div>
+    <div class="body" style="text-align:center;margin-bottom:20px;max-width:460px">Track invoices, payments, clients, and overdue amounts — all in a beautiful web dashboard. Login with WhatsApp OTP.</div>
+    <img src="pitch-assets/dashboard-overview.png" class="screen-img" style="max-height:52vh;width:auto;object-fit:contain;max-width:700px" alt="BillKaro Owner Dashboard">
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;justify-content:center">
+      <span class="pill pill-green">💰 Financial Overview</span>
+      <span class="pill pill-amber">📋 Invoice List</span>
+      <span class="pill pill-blue">👥 Client Directory</span>
+      <span class="pill pill-purple">🔐 WhatsApp OTP Login</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 11: COMPARISON -->
+  <div class="slide" id="slide-10">
+    <div class="label green" style="margin-bottom:14px">WHY CHOOSE US</div>
+    <div class="big white" style="text-align:center;margin-bottom:24px">Vs. everything else</div>
+    <div style="max-width:680px;width:100%;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;text-align:center;font-family:'Inter',sans-serif">
+        <thead><tr>
+          <th style="padding:10px;font-size:10px;color:#3A5A3A;text-align:left;border-bottom:1px solid #1E2E1E"></th>
+          <th style="padding:10px;font-size:10px;color:#ff5252;border-bottom:1px solid #1E2E1E">Manual (Excel/Bill Book)</th>
+          <th style="padding:10px;font-size:10px;color:#ffab40;border-bottom:1px solid #1E2E1E">Zoho / Vyapar</th>
+          <th style="padding:10px;background:rgba(37,211,102,.05);font-size:11px;color:#25D366;font-weight:800;border-bottom:2px solid #25D366;border-radius:6px 6px 0 0">BillKaro</th>
+        </tr></thead>
+        <tbody>
+          <tr><td style="padding:8px 10px;font-size:11px;color:#5A7A5A;text-align:left;border-bottom:1px solid #0D150D">Invoice Creation</td><td style="padding:8px;font-size:11px;color:#ff5252;border-bottom:1px solid #0D150D">45 min</td><td style="padding:8px;font-size:11px;color:#ffab40;border-bottom:1px solid #0D150D">5-10 min</td><td style="padding:8px;font-size:11px;color:#25D366;font-weight:700;background:rgba(37,211,102,.03);border-bottom:1px solid #0D150D">10 seconds</td></tr>
+          <tr><td style="padding:8px 10px;font-size:11px;color:#5A7A5A;text-align:left;border-bottom:1px solid #0D150D">Payment Reminders</td><td style="padding:8px;font-size:11px;color:#ff5252;border-bottom:1px solid #0D150D">❌ Manual</td><td style="padding:8px;font-size:11px;color:#ffab40;border-bottom:1px solid #0D150D">Email only</td><td style="padding:8px;font-size:11px;color:#25D366;font-weight:700;background:rgba(37,211,102,.03);border-bottom:1px solid #0D150D">✅ WhatsApp Auto</td></tr>
+          <tr><td style="padding:8px 10px;font-size:11px;color:#5A7A5A;text-align:left;border-bottom:1px solid #0D150D">Transaction Fee</td><td style="padding:8px;font-size:11px;color:#5A7A5A;border-bottom:1px solid #0D150D">N/A</td><td style="padding:8px;font-size:11px;color:#ff5252;border-bottom:1px solid #0D150D">2-3% MDR</td><td style="padding:8px;font-size:11px;color:#25D366;font-weight:700;background:rgba(37,211,102,.03);border-bottom:1px solid #0D150D">✅ Zero MDR</td></tr>
+          <tr><td style="padding:8px 10px;font-size:11px;color:#5A7A5A;text-align:left;border-bottom:1px solid #0D150D">Voice Input</td><td style="padding:8px;font-size:11px;color:#ff5252;border-bottom:1px solid #0D150D">❌</td><td style="padding:8px;font-size:11px;color:#ff5252;border-bottom:1px solid #0D150D">❌</td><td style="padding:8px;font-size:11px;color:#25D366;font-weight:700;background:rgba(37,211,102,.03);border-bottom:1px solid #0D150D">✅ Hindi + English</td></tr>
+          <tr><td style="padding:8px 10px;font-size:11px;color:#5A7A5A;text-align:left;border-bottom:1px solid #0D150D">App Required?</td><td style="padding:8px;font-size:11px;color:#5A7A5A;border-bottom:1px solid #0D150D">Desktop only</td><td style="padding:8px;font-size:11px;color:#ffab40;border-bottom:1px solid #0D150D">App download</td><td style="padding:8px;font-size:11px;color:#25D366;font-weight:700;background:rgba(37,211,102,.03);border-bottom:1px solid #0D150D">✅ Just WhatsApp</td></tr>
+          <tr><td style="padding:8px 10px;font-size:11px;color:#5A7A5A;text-align:left">Learning Curve</td><td style="padding:8px;font-size:11px;color:#ffab40">⚠️ Excel skills</td><td style="padding:8px;font-size:11px;color:#ffab40">⚠️ Complex UI</td><td style="padding:8px;font-size:11px;color:#25D366;font-weight:700;background:rgba(37,211,102,.03)">✅ Zero — just talk</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SLIDE 12: PRICING -->
+  <div class="slide" id="slide-11">
+    <div class="label green" style="margin-bottom:14px">PRICING</div>
+    <div class="big white" style="text-align:center;margin-bottom:6px">Simple, transparent pricing</div>
+    <div class="body" style="text-align:center;margin-bottom:24px">No hidden charges. No MDR. Cancel anytime.</div>
+    <div class="grid-3 price-grid" style="max-width:720px;width:100%;align-items:start">
+      <div class="price-card">
+        <div class="price-name white">Starter</div>
+        <div class="price-amount green">FREE</div>
+        <div class="price-period">forever</div>
+        <div class="price-features">
+          <div class="price-feat">Up to 20 invoices/month</div>
+          <div class="price-feat">Voice + text invoicing</div>
+          <div class="price-feat">PDF with UPI QR code</div>
+          <div class="price-feat">Basic auto-reminders</div>
+          <div class="price-feat">WhatsApp OTP dashboard</div>
+        </div>
+        <button class="price-btn ghost">Get Started Free →</button>
+      </div>
+      <div class="price-card featured">
+        <div class="price-badge">MOST POPULAR</div>
+        <div class="price-name green">Pro</div>
+        <div class="price-amount green">₹499</div>
+        <div class="price-period">per month</div>
+        <div class="price-features">
+          <div class="price-feat">Unlimited invoices</div>
+          <div class="price-feat">Everything in Starter</div>
+          <div class="price-feat">Full auto-chaser sequence</div>
+          <div class="price-feat">Client directory + scores</div>
+          <div class="price-feat">Priority WhatsApp support</div>
+        </div>
+        <button class="price-btn primary">Start 7-Day Trial →</button>
+      </div>
+      <div class="price-card">
+        <div class="price-name blue">Business</div>
+        <div class="price-amount blue">₹999</div>
+        <div class="price-period">per month</div>
+        <div class="price-features">
+          <div class="price-feat">Everything in Pro</div>
+          <div class="price-feat">Multi-user accounts</div>
+          <div class="price-feat">Custom invoice branding</div>
+          <div class="price-feat">CSV/Excel export</div>
+          <div class="price-feat">Dedicated account manager</div>
+        </div>
+        <button class="price-btn ghost">Contact Us →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 13: CTA -->
+  <div class="slide" id="slide-12">
+    <div class="cta-card">
+      <div style="font-size:44px;margin-bottom:14px">🧾</div>
+      <div class="label green" style="margin-bottom:10px">READY TO GET PAID FASTER?</div>
+      <div class="big white" style="margin-bottom:8px">Start billing on WhatsApp today</div>
+      <div class="body" style="margin-bottom:28px;max-width:380px;margin-left:auto;margin-right:auto">Free forever plan. 30-second onboarding. No app download. Your first invoice in under a minute.</div>
+      <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:20px">
+        <div class="stat-box" style="min-width:130px;border-color:rgba(37,211,102,.25)"><div style="font-size:20px;margin-bottom:4px">📞</div><div style="font-size:12px;color:#E8E8F0;font-weight:700">+91 9452661608</div><div class="stat-lbl">Call or WhatsApp</div></div>
+        <div class="stat-box" style="min-width:130px;border-color:rgba(100,181,246,.25)"><div style="font-size:20px;margin-bottom:4px">📧</div><div style="font-size:12px;color:#E8E8F0;font-weight:700">hello@zentily.com</div><div class="stat-lbl">Email Us</div></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <div class="pill pill-green">✅ Free Forever Plan</div>
+        <div class="pill pill-green">✅ 30-Sec Onboarding</div>
+        <div class="pill pill-green">✅ Zero MDR</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- NAVIGATION BAR -->
+<div class="nav-bar">
+  <button class="nav-btn" id="prevBtn" onclick="prevSlide()">← Prev</button>
+  <div class="nav-center">
+    <div class="nav-dots" id="navDots"></div>
+    <div class="slide-counter" id="slideCounter">1 / 13</div>
+  </div>
+  <button class="nav-btn primary" id="nextBtn" onclick="nextSlide()">Next →</button>
+</div>
+
+<script>
+  var cs=0,ts=13;
+  var dotsC=document.getElementById('navDots');
+  for(var i=0;i<ts;i++){var d=document.createElement('div');d.className='nav-dot'+(i===0?' active':'');d.dataset.i=i;d.onclick=function(){goTo(parseInt(this.dataset.i))};dotsC.appendChild(d)}
+  function goTo(n){if(n<0||n>=ts||n===cs)return;document.querySelectorAll('.slide').forEach(function(s,i){s.className='slide'+(i===n?' active':'')});cs=n;document.querySelectorAll('.nav-dot').forEach(function(d,i){d.className='nav-dot'+(i===cs?' active':'')});document.getElementById('slideCounter').textContent=(cs+1)+' / '+ts;document.getElementById('prevBtn').style.opacity=cs===0?'.3':'1';document.getElementById('prevBtn').style.pointerEvents=cs===0?'none':'auto';document.getElementById('nextBtn').textContent=cs===ts-1?'Get Started →':'Next →'}
+  function nextSlide(){goTo(cs+1)}function prevSlide(){goTo(cs-1)}
+  document.addEventListener('keydown',function(e){if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();nextSlide()}if(e.key==='ArrowLeft'){e.preventDefault();prevSlide()}});
+  var tx=0;document.addEventListener('touchstart',function(e){tx=e.changedTouches[0].screenX});document.addEventListener('touchend',function(e){var d=tx-e.changedTouches[0].screenX;if(Math.abs(d)>50){d>0?nextSlide():prevSlide()}});
+  document.getElementById('prevBtn').style.opacity='.3';document.getElementById('prevBtn').style.pointerEvents='none';
+</script>
+</body>
+</html>

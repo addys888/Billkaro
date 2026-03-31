@@ -1,6 +1,6 @@
 import { prisma } from '../../db/prisma';
 import { User } from '@prisma/client';
-import { sendTextMessage, sendButtonMessage, sendMediaMessage } from '../../services/whatsapp.service';
+import { sendTextMessage, sendButtonMessage, sendMediaMessage, uploadMedia } from '../../services/whatsapp.service';
 import { parseInvoiceFromText, ParsedInvoice } from '../../services/nlu.service';
 import { createInvoice } from '../../services/invoice.service';
 import { scheduleReminders } from '../../services/reminder.service';
@@ -9,6 +9,7 @@ import { formatCurrency } from '../../utils/currency';
 import { formatDateShort, addDays } from '../../utils/dates';
 import { generateUPILink } from '../../utils/upi';
 import { formatBankDetails } from '../../services/payment.service';
+import { getPDFBuffer } from '../../services/storage.service';
 import { PrismaClient } from '@prisma/client';
 import { config } from '../../config';
 import { logger } from '../../utils/logger';
@@ -268,13 +269,20 @@ async function confirmAndSendInvoice(
       ],
     });
 
-    // Send PDF as document attachment if generated
+    // Send PDF as document attachment via WhatsApp media upload
     if (result.pdfUrl) {
       try {
+        // Get PDF buffer (from R2 in production, local in dev)
+        const pdfBuffer = await getPDFBuffer(result.pdfUrl);
+
+        // Upload to WhatsApp servers
+        const mediaId = await uploadMedia(pdfBuffer, `${result.invoiceNo}.pdf`, 'application/pdf');
+
+        // Send using the uploaded media ID
         await sendMediaMessage({
           to: phone,
           type: 'document',
-          mediaUrl: `${config.APP_URL}${result.pdfUrl}`,
+          mediaId,
           caption: `Invoice #${result.invoiceNo} - ${formatCurrency(result.totalAmount)}`,
           filename: `${result.invoiceNo}.pdf`,
         });
@@ -283,8 +291,6 @@ async function confirmAndSendInvoice(
       }
     }
   } catch (error: any) {
-    console.error('------- INVOICE CREATION TRUE ERROR -------');
-    console.error(error);
     logger.error('Invoice creation failed', { 
       phone, 
       errorMessage: error?.message,
@@ -353,16 +359,19 @@ async function sendInvoiceToClient(
       '',
       `Hi ${parsedInvoice.clientName},`,
       '',
-      `Please find your invoice #${invoiceNo} for ${formatCurrency(total)} (${description}).`,
+      `Please find your invoice #${invoiceNo} for *${formatCurrency(total)}* (${description}).`,
       '',
-      upiPayLine,
-      user.upiId ? `UPI ID: ${user.upiId}` : '',
-      '',
+      '━━━━━━━━━━━━━━━━━━',
+      '*💳 Payment Details:*',
+      user.upiId ? `📲 UPI ID: *${user.upiId}*` : '',
       bankLine || '',
+      '━━━━━━━━━━━━━━━━━━',
       '',
-      `Due by: ${formatDateShort(dueDate)}`,
+      `📅 Due by: ${formatDateShort(dueDate)}`,
       '',
-      `*Zero convenience fee* — pay directly to our account 💰`,
+      `✅ *Zero convenience fee* — pay directly to our account`,
+      '',
+      `📎 _PDF invoice with QR code attached below_`,
       '',
       `Thank you for your business! 🙏`,
       `— ${user.businessName}`,
@@ -372,13 +381,20 @@ async function sendInvoiceToClient(
 
     // Send PDF if available
     if (pdfUrl) {
-      await sendMediaMessage({
-        to: clientPhone,
-        type: 'document',
-        mediaUrl: `${config.APP_URL}${pdfUrl}`,
-        caption: `Invoice #${invoiceNo}`,
-        filename: `${invoiceNo}.pdf`,
-      });
+      try {
+        const pdfBuffer = await getPDFBuffer(pdfUrl);
+        const mediaId = await uploadMedia(pdfBuffer, `${invoiceNo}.pdf`, 'application/pdf');
+
+        await sendMediaMessage({
+          to: clientPhone,
+          type: 'document',
+          mediaId,
+          caption: `Invoice #${invoiceNo}`,
+          filename: `${invoiceNo}.pdf`,
+        });
+      } catch (pdfError) {
+        logger.warn('Failed to send PDF to client', { invoiceNo, error: pdfError });
+      }
     }
 
     await sendTextMessage({
@@ -387,12 +403,22 @@ async function sendInvoiceToClient(
     });
 
     await clearSession(phone);
-  } catch (error) {
-    logger.error('Failed to send invoice to client', { phone, clientPhone, error });
-    await sendTextMessage({
-      to: phone,
-      text: '❌ Failed to send to client. You can share the invoice manually.',
+  } catch (error: any) {
+    const errMsg = error?.message || 'Unknown error';
+    logger.error('Failed to send invoice to client', { 
+      phone, 
+      clientPhone, 
+      errorMessage: errMsg,
+      errorStack: error?.stack,
     });
+
+    // Check if it's a WhatsApp API restriction (test number can only message verified recipients)
+    const isRecipientError = errMsg.includes('not a valid WhatsApp') || errMsg.includes('1013') || errMsg.includes('131030');
+    const userMsg = isRecipientError
+      ? `❌ Could not send to ${clientPhone}. This number may not be registered on WhatsApp, or your Meta test number can only message verified recipients.\n\n💡 Add the recipient in Meta Developer Console → WhatsApp → API Setup → "To" field.`
+      : `❌ Failed to send to client: ${errMsg.substring(0, 100)}\n\nYou can share the invoice manually via the PDF.`;
+
+    await sendTextMessage({ to: phone, text: userMsg });
     await clearSession(phone);
   }
 }

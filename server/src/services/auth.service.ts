@@ -3,13 +3,15 @@ import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { config } from '../config';
-import { sendTextMessage } from './whatsapp.service';
+import { sendTextMessage, sendTemplateMessage } from './whatsapp.service';
 import { logger } from '../utils/logger';
 
 
 
 /**
  * Generate and send OTP via WhatsApp
+ * Uses template message in production (required to initiate conversations)
+ * Uses plain text in development (simpler for testing)
  */
 export async function sendOTP(phone: string): Promise<void> {
   // Generate 6-digit OTP
@@ -21,13 +23,28 @@ export async function sendOTP(phone: string): Promise<void> {
     data: { phone, code, expiresAt },
   });
 
-  // Send via WhatsApp
-  await sendTextMessage({
-    to: phone,
-    text: `🔐 Your BillKaro login OTP is: *${code}*\n\nThis code expires in 10 minutes. Do not share it with anyone.`,
-  });
+  if (config.NODE_ENV === 'production') {
+    // Production: Use pre-approved template message (works outside 24h window)
+    await sendTemplateMessage({
+      to: phone,
+      templateName: 'otp_login',
+      languageCode: 'en',
+      components: [
+        {
+          type: 'body',
+          parameters: [{ type: 'text', text: code }],
+        },
+      ],
+    });
+  } else {
+    // Development: Use plain text message (simpler, works within 24h window)
+    await sendTextMessage({
+      to: phone,
+      text: `🔐 Your BillKaro login OTP is: *${code}*\n\nThis code expires in 10 minutes. Do not share it with anyone.`,
+    });
+  }
 
-  logger.info('OTP sent', { phone: phone.slice(-4) });
+  logger.info('OTP sent', { phone: phone.slice(-4), mode: config.NODE_ENV });
 }
 
 /**

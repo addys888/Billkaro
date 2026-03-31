@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { handleIncomingMessage } from '../bot/message-handler';
 import { verifyWhatsAppWebhook } from '../middleware/webhook-verify.middleware';
+import { verifyWebhookSignature } from '../middleware/webhook-signature.middleware';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -9,7 +10,7 @@ const router = Router();
 router.get('/whatsapp', verifyWhatsAppWebhook);
 
 // ── WhatsApp Incoming Messages (POST) ─────────────────────
-router.post('/whatsapp', async (req: Request, res: Response) => {
+router.post('/whatsapp', verifyWebhookSignature, async (req: Request, res: Response) => {
   try {
     require('fs').writeFileSync('/tmp/billkaro_webhook.json', JSON.stringify(req.body, null, 2));
     // Always respond 200 immediately to WhatsApp

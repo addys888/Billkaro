@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 import { formatCurrency, formatNumber } from '../utils/currency';
 import { formatDateNumeric } from '../utils/dates';
 import { generateUPIQRCode } from '../utils/upi';
+import { uploadToR2 } from './storage.service';
 
 interface InvoiceData {
   invoiceNo: string;
@@ -75,7 +76,8 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
     // Generate PDF with Puppeteer
     const browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
     });
 
     const page = await browser.newPage();
@@ -98,18 +100,24 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
 }
 
 /**
- * Save PDF to local storage (for MVP; replace with S3/R2 in production)
+ * Save PDF — uploads to R2 in production, local filesystem in dev
+ */
+export async function savePDF(invoiceNo: string, pdfBuffer: Buffer): Promise<string> {
+  const key = `invoices/${invoiceNo}.pdf`;
+
+  try {
+    const url = await uploadToR2(pdfBuffer, key, 'application/pdf');
+    logger.info('PDF saved', { invoiceNo, url });
+    return url;
+  } catch (error: any) {
+    logger.error('PDF save failed', { invoiceNo, errorMessage: error?.message });
+    throw error;
+  }
+}
+
+/**
+ * Legacy local save — kept for backward compatibility
  */
 export async function savePDFLocally(invoiceNo: string, pdfBuffer: Buffer): Promise<string> {
-  const dir = path.join(__dirname, '..', '..', 'tmp', 'invoices');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-
-  const filename = `${invoiceNo}.pdf`;
-  const filepath = path.join(dir, filename);
-  fs.writeFileSync(filepath, pdfBuffer);
-
-  // Return a URL path (served by Express static)
-  return `/invoices/${filename}`;
+  return savePDF(invoiceNo, pdfBuffer);
 }

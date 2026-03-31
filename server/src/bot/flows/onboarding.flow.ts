@@ -1,7 +1,7 @@
 import { prisma } from '../../db/prisma';
 import { PrismaClient, User } from '@prisma/client';
 import { sendTextMessage, sendButtonMessage } from '../../services/whatsapp.service';
-import { updateSession, clearSession } from '../session-manager';
+import { updateSession, clearSession, getSession } from '../session-manager';
 import { ONBOARDING_STEPS } from '../../config/constants';
 import { logger } from '../../utils/logger';
 
@@ -39,8 +39,26 @@ export async function handleOnboardingStep(
     return;
   }
 
-  // Determine current step from session
-  const { currentStep } = await import('../session-manager').then((m) => m.getSession(phone));
+  // Get session state
+  const session = await getSession(phone);
+  const { currentStep, currentFlow } = session;
+
+  // Dashboard-registered user messaging on WhatsApp for the first time
+  // (user exists but no onboarding session was started via WhatsApp)
+  if (!currentFlow || currentFlow !== 'onboarding') {
+    await sendTextMessage({
+      to: phone,
+      text: `🎉 *Welcome to BillKaro!*\n\nLet's finish setting up your account in 90 seconds so you can start creating invoices via WhatsApp.\n\n1️⃣ What is your *Business Name*?`,
+    });
+
+    await updateSession(phone, {
+      currentFlow: 'onboarding',
+      currentStep: 'BUSINESS_NAME',
+      flowData: {},
+    });
+    return; // Don't process the current message — wait for their reply
+  }
+
   const step = currentStep || 'BUSINESS_NAME';
 
   switch (step) {
