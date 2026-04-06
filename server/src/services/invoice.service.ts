@@ -50,7 +50,7 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
   const totalAmount = subtotal + gstAmount;
 
   // Generate invoice number
-  const invoiceNo = await generateInvoiceNumber(userId);
+  const invoiceNo = await generateInvoiceNumber(userId, user.businessName);
 
   // Calculate due date
   const paymentTerms = dueDays || user.defaultPaymentTermsDays;
