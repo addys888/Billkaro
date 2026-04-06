@@ -286,8 +286,9 @@ async function confirmAndSendInvoice(
           caption: `Invoice #${result.invoiceNo} - ${formatCurrency(result.totalAmount)}`,
           filename: `${result.invoiceNo}.pdf`,
         });
-      } catch (pdfError) {
-        logger.warn('Failed to send PDF to merchant', { invoiceNo: result.invoiceNo, error: pdfError });
+      } catch (pdfError: any) {
+        logger.warn('Failed to send PDF to merchant', { invoiceNo: result.invoiceNo, error: pdfError?.message });
+        console.error('🔴 PDF SEND ERROR:', pdfError);
       }
     }
   } catch (error: any) {
