@@ -37,11 +37,18 @@ export async function sendOTP(phone: string): Promise<void> {
       ],
     });
   } else {
-    // Development: Use plain text message (simpler, works within 24h window)
-    await sendTextMessage({
-      to: phone,
-      text: `🔐 Your BillKaro login OTP is: *${code}*\n\nThis code expires in 10 minutes. Do not share it with anyone.`,
-    });
+    // Development: Log OTP to console (skip WhatsApp API)
+    logger.info(`\n${'='.repeat(50)}\n🔐 DEV OTP for ${phone}: ${code}\n${'='.repeat(50)}\n`);
+    
+    // Optionally try WhatsApp, but don't fail if it errors
+    try {
+      await sendTextMessage({
+        to: phone,
+        text: `🔐 Your BillKaro login OTP is: *${code}*\n\nThis code expires in 10 minutes. Do not share it with anyone.`,
+      });
+    } catch (whatsappErr) {
+      logger.warn('WhatsApp send failed (dev mode — OTP logged to console above)');
+    }
   }
 
   logger.info('OTP sent', { phone: phone.slice(-4), mode: config.NODE_ENV });
