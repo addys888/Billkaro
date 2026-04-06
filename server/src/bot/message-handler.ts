@@ -150,6 +150,15 @@ async function handleInteractiveReply(phone: string, buttonId: string): Promise<
     case 'send_to_client':
       await handleInvoiceFlow(phone, '__SEND_TO_CLIENT__', user, session);
       break;
+    case 'done_invoice':
+      // Just clear session — invoice is already created
+      if (session) {
+        const { clearSession } = await import('./session-manager');
+        await clearSession(phone);
+      }
+      const { sendTextMessage } = await import('../services/whatsapp.service');
+      await sendTextMessage({ to: phone, text: '✅ All done! Send another invoice anytime.' });
+      break;
     case 'call_client':
     case 'send_final_reminder':
     case 'pause_reminders':

@@ -265,7 +265,7 @@ async function confirmAndSendInvoice(
       bodyText: successMsg,
       buttons: [
         { id: 'send_to_client', title: '📤 Send to Client' },
-        { id: 'cancel_invoice', title: '📋 Done' },
+        { id: 'done_invoice', title: '📋 Done' },
       ],
     });
 
