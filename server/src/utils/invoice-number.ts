@@ -13,19 +13,31 @@ export async function generateInvoiceNumber(userId: string): Promise<string> {
   const prefix = config.INVOICE_PREFIX;
   const year = new Date().getFullYear();
 
-  // Count existing invoices for this user in the current financial year
+  // Find the highest existing invoice number for this user in the current FY
   const currentFY = getCurrentFinancialYear();
   const fyStartYear = parseInt(currentFY.split('-')[0], 10);
   const fyStart = new Date(fyStartYear, 3, 1); // April 1st
 
-  const count = await prisma.invoice.count({
+  const latestInvoice = await prisma.invoice.findFirst({
     where: {
       userId,
       createdAt: { gte: fyStart },
     },
+    orderBy: { createdAt: 'desc' },
+    select: { invoiceNo: true },
   });
 
-  const nextNumber = (count + 1).toString().padStart(4, '0');
+  let nextNum = 1;
+  if (latestInvoice?.invoiceNo) {
+    // Extract the number part (e.g., "BK-2026-0003" → 3)
+    const parts = latestInvoice.invoiceNo.split('-');
+    const lastNum = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(lastNum)) {
+      nextNum = lastNum + 1;
+    }
+  }
+
+  const nextNumber = nextNum.toString().padStart(4, '0');
   return `${prefix}-${year}-${nextNumber}`;
 }
 

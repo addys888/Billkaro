@@ -294,8 +294,10 @@ async function confirmAndSendInvoice(
     logger.error('Invoice creation failed', { 
       phone, 
       errorMessage: error?.message,
-      errorStack: error?.stack,
+      errorCode: error?.code,
+      errorStack: error?.stack?.split('\n').slice(0, 5).join('\n'),
     });
+    console.error('🔴 FULL INVOICE ERROR:', error);
     await sendTextMessage({
       to: phone,
       text: '❌ Failed to create invoice. Please try again.',
