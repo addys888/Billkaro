@@ -164,6 +164,12 @@ async function handleInteractiveReply(phone: string, buttonId: string): Promise<
     case 'pause_reminders':
       await handleCommand(phone, buttonId, user);
       break;
+    case 'edit_amount':
+    case 'edit_client':
+    case 'edit_items':
+      // Forward edit sub-menu button IDs directly to invoice flow
+      await handleInvoiceFlow(phone, buttonId, user, session);
+      break;
     default:
       // Check onboarding buttons (terms_7, terms_15, terms_30, bank_yes, bank_skip)
       if (buttonId.startsWith('terms_') || buttonId.startsWith('bank_')) {
