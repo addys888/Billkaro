@@ -48,7 +48,7 @@ Handlebars.registerHelper('inc', (value: number) => value + 1);
  */
 export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
   try {
-    // Generate UPI QR code if UPI ID available
+    // Generate UPI  A QR code if UPI ID available
     let qrCodeDataUrl: string | undefined;
     if (data.businessUpiId) {
       qrCodeDataUrl = await generateUPIQRCode({
