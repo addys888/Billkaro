@@ -270,13 +270,10 @@ async function confirmAndSendInvoice(
     });
 
     // Send PDF as document attachment via WhatsApp media upload
-    if (result.pdfUrl) {
+    if (result.pdfBuffer) {
       try {
-        // Get PDF buffer (from R2 in production, local in dev)
-        const pdfBuffer = await getPDFBuffer(result.pdfUrl);
-
-        // Upload to WhatsApp servers
-        const mediaId = await uploadMedia(pdfBuffer, `${result.invoiceNo}.pdf`, 'application/pdf');
+        // Upload buffer directly to WhatsApp servers (no need to re-download)
+        const mediaId = await uploadMedia(result.pdfBuffer, `${result.invoiceNo}.pdf`, 'application/pdf');
 
         // Send using the uploaded media ID
         await sendMediaMessage({

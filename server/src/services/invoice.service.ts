@@ -25,6 +25,7 @@ interface InvoiceResult {
   invoiceNo: string;
   totalAmount: number;
   pdfUrl: string;
+  pdfBuffer?: Buffer;
   paymentLink: string;
   clientId: string;
 }
@@ -80,8 +81,9 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
 
   // Generate PDF
   let pdfUrl = '';
+  let pdfBuf: Buffer | undefined;
   try {
-    const pdfBuffer = await generateInvoicePDF({
+    pdfBuf = await generateInvoicePDF({
       invoiceNo,
       createdAt: invoice.createdAt,
       dueDate,
@@ -105,7 +107,7 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
       notes: notes || undefined,
     });
 
-    pdfUrl = await savePDFLocally(invoiceNo, pdfBuffer);
+    pdfUrl = await savePDFLocally(invoiceNo, pdfBuf);
   } catch (error) {
     logger.error('PDF generation failed for invoice', { invoiceNo, error });
   }
@@ -150,6 +152,7 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
     invoiceNo,
     totalAmount,
     pdfUrl,
+    pdfBuffer: pdfBuf,
     paymentLink,
     clientId: client.id,
   };
