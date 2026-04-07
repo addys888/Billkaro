@@ -74,25 +74,37 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
     });
 
     // Generate PDF with Puppeteer
+    logger.info('Launching Puppeteer for PDF generation', { invoiceNo: data.invoiceNo });
     const browser = await puppeteer.launch({
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+        '--single-process',
+        '--no-zygote',
+      ],
+      timeout: 30000,
     });
 
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'load' });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'load', timeout: 15000 });
 
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '15mm', right: '15mm', bottom: '15mm', left: '15mm' },
-    });
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '15mm', right: '15mm', bottom: '15mm', left: '15mm' },
+        timeout: 15000,
+      });
 
-    await browser.close();
-
-    logger.info('PDF generated', { invoiceNo: data.invoiceNo, size: pdfBuffer.length });
-    return Buffer.from(pdfBuffer);
+      logger.info('PDF generated', { invoiceNo: data.invoiceNo, size: pdfBuffer.length });
+      return Buffer.from(pdfBuffer);
+    } finally {
+      await browser.close();
+    }
   } catch (error) {
     logger.error('PDF generation failed', { invoiceNo: data.invoiceNo, error });
     throw error;
