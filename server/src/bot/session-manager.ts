@@ -1,10 +1,31 @@
 import { prisma } from '../db/prisma';
 import { PrismaClient } from '@prisma/client';
-import IORedis from 'ioredis';
 import { config } from '../config';
+import { logger } from '../utils/logger';
 
+// Try to connect to Redis if available, otherwise use DB-only mode
+let redis: any = null;
 
-const redis = new IORedis(config.REDIS_URL);
+try {
+  if (config.REDIS_URL) {
+    const IORedis = require('ioredis');
+    redis = new IORedis(config.REDIS_URL, {
+      maxRetriesPerRequest: 1,
+      retryStrategy: (times: number) => {
+        if (times > 2) return null; // Stop retrying after 2 attempts
+        return Math.min(times * 100, 1000);
+      },
+      lazyConnect: true,
+    });
+    redis.connect().catch((err: any) => {
+      logger.warn('Redis not available, using DB-only sessions', { error: err.message });
+      redis = null;
+    });
+  }
+} catch (err: any) {
+  logger.warn('Redis not available, using DB-only sessions', { error: err.message });
+  redis = null;
+}
 
 const SESSION_TTL = 60 * 30; // 30 minutes
 const SESSION_PREFIX = 'session:';
@@ -19,9 +40,15 @@ interface ConversationSession {
  * Get the current conversation session for a phone number
  */
 export async function getSession(phone: string): Promise<ConversationSession> {
-  // Try Redis first (fast)
-  const cached = await redis.get(`${SESSION_PREFIX}${phone}`);
-  if (cached) return JSON.parse(cached);
+  // Try Redis first (fast) — only if available
+  if (redis) {
+    try {
+      const cached = await redis.get(`${SESSION_PREFIX}${phone}`);
+      if (cached) return JSON.parse(cached);
+    } catch {
+      // Redis unavailable, continue to DB
+    }
+  }
 
   // Fall back to database
   const state = await prisma.conversationState.findUnique({ where: { phone } });
@@ -31,8 +58,12 @@ export async function getSession(phone: string): Promise<ConversationSession> {
       currentStep: state.currentStep,
       flowData: state.flowData as Record<string, any>,
     };
-    // Cache in Redis
-    await redis.setex(`${SESSION_PREFIX}${phone}`, SESSION_TTL, JSON.stringify(session));
+    // Cache in Redis if available
+    if (redis) {
+      try {
+        await redis.setex(`${SESSION_PREFIX}${phone}`, SESSION_TTL, JSON.stringify(session));
+      } catch { /* ignore */ }
+    }
     return session;
   }
 
@@ -50,8 +81,12 @@ export async function updateSession(
   const current = await getSession(phone);
   const updated = { ...current, ...updates };
 
-  // Update Redis
-  await redis.setex(`${SESSION_PREFIX}${phone}`, SESSION_TTL, JSON.stringify(updated));
+  // Update Redis if available
+  if (redis) {
+    try {
+      await redis.setex(`${SESSION_PREFIX}${phone}`, SESSION_TTL, JSON.stringify(updated));
+    } catch { /* ignore */ }
+  }
 
   // Update database
   await prisma.conversationState.upsert({
@@ -74,7 +109,11 @@ export async function updateSession(
  * Clear the conversation session (flow complete)
  */
 export async function clearSession(phone: string): Promise<void> {
-  await redis.del(`${SESSION_PREFIX}${phone}`);
+  if (redis) {
+    try {
+      await redis.del(`${SESSION_PREFIX}${phone}`);
+    } catch { /* ignore */ }
+  }
   await prisma.conversationState.upsert({
     where: { phone },
     create: { phone, currentFlow: null, currentStep: null, flowData: {} },
