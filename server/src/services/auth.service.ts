@@ -24,17 +24,11 @@ export async function sendOTP(phone: string): Promise<void> {
   });
 
   if (config.NODE_ENV === 'production') {
-    // Production: Use pre-approved template message (works outside 24h window)
-    await sendTemplateMessage({
+    // Send OTP via WhatsApp text message
+    // TODO: Switch to sendTemplateMessage('otp_login') once Meta approves the template
+    await sendTextMessage({
       to: phone,
-      templateName: 'otp_login',
-      languageCode: 'en',
-      components: [
-        {
-          type: 'body',
-          parameters: [{ type: 'text', text: code }],
-        },
-      ],
+      text: `🔐 Your BillKaro login OTP is: *${code}*\n\nValid for 10 minutes. Do not share with anyone.`,
     });
   } else {
     // Development: Log OTP to console (skip WhatsApp API)
