@@ -1,4 +1,6 @@
 import PDFDocument from 'pdfkit';
+import * as fs from 'fs';
+import * as path from 'path';
 import { logger } from '../utils/logger';
 import { formatNumber } from '../utils/currency';
 import { formatDateNumeric } from '../utils/dates';
@@ -54,14 +56,26 @@ function fmt(amount: number): string {
   return formatNumber(amount);
 }
 
-// Helper: draw a horizontal line
 function hline(doc: PDFKit.PDFDocument, y: number, x1: number, x2: number, color = C.borderLight, width = 0.5) {
   doc.moveTo(x1, y).lineTo(x2, y).strokeColor(color).lineWidth(width).stroke();
 }
 
-// Helper: draw a filled rect
 function rect(doc: PDFKit.PDFDocument, x: number, y: number, w: number, h: number, color: string) {
   doc.rect(x, y, w, h).fill(color);
+}
+
+// Load BillKaro logo
+function getLogoPath(): string | null {
+  const possiblePaths = [
+    path.join(__dirname, '..', 'templates', 'billkaro-logo.png'),
+    path.join(__dirname, 'templates', 'billkaro-logo.png'),
+    path.join(process.cwd(), 'src', 'templates', 'billkaro-logo.png'),
+    path.join(process.cwd(), 'dist', 'templates', 'billkaro-logo.png'),
+  ];
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
 }
 
 /**
@@ -72,7 +86,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
     try {
       const doc = new PDFDocument({
         size: 'A4',
-        margins: { top: 40, bottom: 40, left: 45, right: 45 },
+        margins: { top: 40, bottom: 40, left: 50, right: 50 },
         info: {
           Title: `Tax Invoice ${data.invoiceNo}`,
           Author: data.businessName,
@@ -85,64 +99,63 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      const L = 45;  // left margin
-      const R = 550; // right edge
-      const W = R - L; // usable width
+      const L = 50;   // left margin
+      const R = 545;   // right edge (595.28 - 50)
+      const W = R - L;  // usable width = 495
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      // HEADER — "TAX INVOICE" title + Business name
+      // TOP ACCENT BAR
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-      // Top accent line
       rect(doc, 0, 0, 612, 4, C.primary);
 
-      let y = 25;
+      let y = 22;
 
-      // Tax Invoice label (top right)
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // HEADER — Business name + TAX INVOICE
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      // Tax Invoice label (right)
       doc.fontSize(10).font('Helvetica').fillColor(C.primary)
-        .text('TAX INVOICE', R - 100, y, { width: 100, align: 'right' });
+        .text('TAX INVOICE', L, y, { width: W, align: 'right' });
 
-      // Business name
-      doc.fontSize(18).font('Helvetica-Bold').fillColor(C.dark)
-        .text(data.businessName, L, y);
+      // Business name (left)
+      doc.fontSize(17).font('Helvetica-Bold').fillColor(C.dark)
+        .text(data.businessName, L, y, { width: W * 0.65 });
 
-      y += 26;
+      y += 25;
 
-      // Business details line
-      const bizDetails: string[] = [];
-      if (data.businessAddress) bizDetails.push(data.businessAddress);
-      if (bizDetails.length > 0) {
+      // Business details
+      if (data.businessAddress) {
         doc.fontSize(8.5).font('Helvetica').fillColor(C.secondary)
-          .text(bizDetails.join(' | '), L, y, { width: W });
+          .text(data.businessAddress, L, y, { width: W * 0.65 });
         y += 13;
       }
 
       const bizMeta: string[] = [];
       if (data.businessGstin) bizMeta.push(`GSTIN: ${data.businessGstin}`);
-      bizMeta.push(`Phone: ${data.businessPhone}`);
+      bizMeta.push(`Ph: ${data.businessPhone}`);
       if (data.businessUpiId) bizMeta.push(`UPI: ${data.businessUpiId}`);
 
-      doc.fontSize(8).font('Helvetica').fillColor(C.light)
+      doc.fontSize(7.5).font('Helvetica').fillColor(C.light)
         .text(bizMeta.join('  |  '), L, y, { width: W });
 
-      y += 20;
+      y += 18;
       hline(doc, y, L, R, C.border, 0.75);
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      // INVOICE META — Invoice #, Date, Due Date (right column)
-      // BILL TO — Client info (left column)
+      // BILL TO + INVOICE DETAILS
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-      y += 15;
+      y += 14;
       const metaStartY = y;
 
-      // --- Left: Bill To ---
-      doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.light)
+      // Left: Bill To
+      doc.fontSize(7).font('Helvetica-Bold').fillColor(C.light)
         .text('BILL TO', L, y);
-      y += 13;
-      doc.fontSize(13).font('Helvetica-Bold').fillColor(C.dark)
+      y += 12;
+      doc.fontSize(12).font('Helvetica-Bold').fillColor(C.dark)
         .text(data.clientName, L, y);
-      y += 18;
+      y += 16;
       if (data.clientPhone) {
         doc.fontSize(8.5).font('Helvetica').fillColor(C.secondary)
           .text(`Phone: ${data.clientPhone}`, L, y);
@@ -154,16 +167,16 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
         y += 12;
       }
 
-      // --- Right: Invoice details box ---
-      const boxX = 360;
-      const boxW = R - boxX;
-      const boxH = 75;
-      rect(doc, boxX, metaStartY - 5, boxW, boxH, C.headerBg);
-      doc.rect(boxX, metaStartY - 5, boxW, boxH).strokeColor(C.borderLight).lineWidth(0.5).stroke();
+      // Right: Invoice details box
+      const boxW = 175;
+      const boxX = R - boxW;
+      const boxH = 72;
+      rect(doc, boxX, metaStartY - 4, boxW, boxH, C.headerBg);
+      doc.rect(boxX, metaStartY - 4, boxW, boxH).strokeColor(C.borderLight).lineWidth(0.5).stroke();
 
-      const labelX = boxX + 12;
-      const valueX = boxX + 85;
-      let ry = metaStartY + 5;
+      const labelX = boxX + 10;
+      const valueX = boxX + 70;
+      let ry = metaStartY + 6;
 
       const metaRows = [
         ['Invoice #', data.invoiceNo],
@@ -171,42 +184,41 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
         ['Due Date', formatDateNumeric(data.dueDate)],
       ];
       metaRows.forEach(([label, value]) => {
-        doc.fontSize(8).font('Helvetica').fillColor(C.secondary)
+        doc.fontSize(7.5).font('Helvetica').fillColor(C.secondary)
           .text(`${label}:`, labelX, ry);
-        doc.fontSize(8.5).font('Helvetica-Bold').fillColor(C.dark)
-          .text(value, valueX, ry);
-        ry += 16;
+        doc.fontSize(8).font('Helvetica-Bold').fillColor(C.dark)
+          .text(value, valueX, ry, { width: boxW - 80 });
+        ry += 15;
       });
 
       // Status badge
-      ry += 2;
-      rect(doc, labelX, ry - 2, 55, 14, '#fef3c7');
-      doc.fontSize(7).font('Helvetica-Bold').fillColor('#92400e')
-        .text('PENDING', labelX + 6, ry);
+      ry += 1;
+      rect(doc, labelX, ry - 1, 52, 13, '#fef3c7');
+      doc.fontSize(6.5).font('Helvetica-Bold').fillColor('#92400e')
+        .text('PENDING', labelX + 5, ry + 1);
 
-      y = Math.max(y, metaStartY + boxH + 10);
-      y += 10;
+      y = Math.max(y, metaStartY + boxH + 8);
+      y += 8;
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       // LINE ITEMS TABLE
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-      // Column positions
-      const colSr    = L;
-      const colItem  = L + 35;
-      const colQty   = L + 290;
-      const colRate  = L + 355;
-      const colAmt   = L + 430;
-      const rowH     = 26;
+      const colSr   = L;
+      const colItem = L + 30;
+      const colQty  = L + 280;
+      const colRate = L + 340;
+      const colAmt  = L + 415;
+      const rowH    = 25;
 
       // Table header
       rect(doc, L, y, W, rowH, C.primary);
-      doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.white);
-      doc.text('#', colSr + 10, y + 8, { width: 25 });
-      doc.text('DESCRIPTION', colItem, y + 8, { width: 240 });
-      doc.text('QTY', colQty, y + 8, { width: 55, align: 'center' });
-      doc.text('RATE (Rs.)', colRate, y + 8, { width: 70, align: 'right' });
-      doc.text('AMOUNT (Rs.)', colAmt, y + 8, { width: 75, align: 'right' });
+      doc.fontSize(7).font('Helvetica-Bold').fillColor(C.white);
+      doc.text('#', colSr + 8, y + 8);
+      doc.text('DESCRIPTION', colItem, y + 8);
+      doc.text('QTY', colQty, y + 8, { width: 50, align: 'center' });
+      doc.text('RATE', colRate, y + 8, { width: 65, align: 'right' });
+      doc.text('AMOUNT', colAmt, y + 8, { width: 80, align: 'right' });
       y += rowH;
 
       // Table rows
@@ -215,83 +227,83 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
         rect(doc, L, y, W, rowH, bg);
 
         doc.fontSize(8.5).font('Helvetica').fillColor(C.text);
-        doc.text(`${i + 1}`, colSr + 10, y + 8, { width: 25 });
-        doc.text(item.name, colItem, y + 8, { width: 240 });
-        doc.text(`${item.quantity}`, colQty, y + 8, { width: 55, align: 'center' });
-        doc.text(fmt(item.rate), colRate, y + 8, { width: 70, align: 'right' });
+        doc.text(`${i + 1}`, colSr + 8, y + 7);
+        doc.text(item.name, colItem, y + 7, { width: 240 });
+        doc.text(`${item.quantity}`, colQty, y + 7, { width: 50, align: 'center' });
+        doc.text(fmt(item.rate), colRate, y + 7, { width: 65, align: 'right' });
         doc.font('Helvetica-Bold').fillColor(C.dark)
-          .text(fmt(item.amount), colAmt, y + 8, { width: 75, align: 'right' });
+          .text(fmt(item.amount), colAmt, y + 7, { width: 80, align: 'right' });
 
         y += rowH;
       });
 
-      // Bottom border of table
+      // Bottom border
       hline(doc, y, L, R, C.border, 0.75);
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       // TOTALS (right-aligned)
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-      y += 12;
-      const tLabelX = colRate - 30;
-      const tValueX = colAmt;
-      const tValueW = 75;
+      y += 10;
+      const tLabelX = R - 185;
+      const tValueX = R - 85;
+      const tValueW = 85;
 
       // Subtotal
       doc.fontSize(8.5).font('Helvetica').fillColor(C.secondary)
-        .text('Subtotal', tLabelX, y, { width: 100, align: 'right' });
-      doc.font('Helvetica').fillColor(C.dark)
+        .text('Subtotal', tLabelX, y, { width: 95, align: 'right' });
+      doc.fillColor(C.dark)
         .text(`Rs. ${fmt(data.subtotal)}`, tValueX, y, { width: tValueW, align: 'right' });
 
-      // GST
+      // GST (split CGST/SGST)
       if (data.gstRate > 0) {
-        y += 16;
         const cgst = data.gstAmount / 2;
+        y += 15;
         doc.fontSize(8.5).font('Helvetica').fillColor(C.secondary)
-          .text(`CGST (${data.gstRate / 2}%)`, tLabelX, y, { width: 100, align: 'right' });
+          .text(`CGST (${data.gstRate / 2}%)`, tLabelX, y, { width: 95, align: 'right' });
         doc.fillColor(C.dark)
           .text(`Rs. ${fmt(cgst)}`, tValueX, y, { width: tValueW, align: 'right' });
 
-        y += 16;
+        y += 15;
         doc.fillColor(C.secondary)
-          .text(`SGST (${data.gstRate / 2}%)`, tLabelX, y, { width: 100, align: 'right' });
+          .text(`SGST (${data.gstRate / 2}%)`, tLabelX, y, { width: 95, align: 'right' });
         doc.fillColor(C.dark)
           .text(`Rs. ${fmt(cgst)}`, tValueX, y, { width: tValueW, align: 'right' });
       }
 
-      // Divider before total
-      y += 14;
+      // Divider
+      y += 13;
       hline(doc, y, tLabelX, R, C.border, 0.5);
 
       // Grand Total
-      y += 8;
+      y += 7;
       rect(doc, tLabelX - 5, y - 3, (R - tLabelX + 5), 24, C.accent);
-      doc.fontSize(10).font('Helvetica-Bold').fillColor(C.primaryDark)
-        .text('TOTAL', tLabelX, y + 2, { width: 100, align: 'right' });
-      doc.fontSize(11).font('Helvetica-Bold').fillColor(C.primaryDark)
-        .text(`Rs. ${fmt(data.totalAmount)}`, tValueX, y + 1, { width: tValueW, align: 'right' });
+      doc.fontSize(9.5).font('Helvetica-Bold').fillColor(C.primaryDark)
+        .text('TOTAL', tLabelX, y + 3, { width: 95, align: 'right' });
+      doc.fontSize(10.5).font('Helvetica-Bold').fillColor(C.primaryDark)
+        .text(`Rs. ${fmt(data.totalAmount)}`, tValueX, y + 2, { width: tValueW, align: 'right' });
 
       // Amount in words
       y += 30;
-      doc.fontSize(8).font('Helvetica-Oblique').fillColor(C.secondary)
+      doc.fontSize(7.5).font('Helvetica-Oblique').fillColor(C.secondary)
         .text(`Amount: Rupees ${numberToWords(data.totalAmount)} Only`, L, y, { width: W });
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      // PAYMENT SECTION — QR code + Bank details
+      // PAYMENT SECTION
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-      y += 25;
+      y += 22;
       hline(doc, y, L, R, C.borderLight, 0.5);
-      y += 12;
+      y += 10;
 
-      doc.fontSize(9).font('Helvetica-Bold').fillColor(C.primary)
+      doc.fontSize(8.5).font('Helvetica-Bold').fillColor(C.primary)
         .text('PAYMENT INFORMATION', L, y);
-      y += 16;
+      y += 15;
 
       let paymentSectionY = y;
       let qrRendered = false;
 
-      // QR Code (left side)
+      // QR Code
       if (data.businessUpiId) {
         try {
           const qrDataUrl = await generateUPIQRCode({
@@ -305,13 +317,12 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
             const qrBase64 = qrDataUrl.replace(/^data:image\/png;base64,/, '');
             const qrBuffer = Buffer.from(qrBase64, 'base64');
 
-            // QR box
-            rect(doc, L, y - 5, 115, 125, C.headerBg);
-            doc.rect(L, y - 5, 115, 125).strokeColor(C.borderLight).lineWidth(0.5).stroke();
+            rect(doc, L, y - 4, 105, 115, C.headerBg);
+            doc.rect(L, y - 4, 105, 115).strokeColor(C.borderLight).lineWidth(0.5).stroke();
 
-            doc.image(qrBuffer, L + 7, y, { width: 100, height: 100 });
-            doc.fontSize(7).font('Helvetica-Bold').fillColor(C.primary)
-              .text('Scan to Pay', L, y + 103, { width: 115, align: 'center' });
+            doc.image(qrBuffer, L + 5, y, { width: 95, height: 95 });
+            doc.fontSize(6.5).font('Helvetica-Bold').fillColor(C.primary)
+              .text('Scan to Pay', L, y + 97, { width: 105, align: 'center' });
             qrRendered = true;
           }
         } catch {
@@ -319,43 +330,43 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
         }
       }
 
-      // Bank/UPI details (right side of QR or left if no QR)
-      const detailX = qrRendered ? L + 130 : L;
+      // Payment details
+      const detailX = qrRendered ? L + 120 : L;
       let dy = paymentSectionY;
 
       if (data.businessUpiId) {
         doc.fontSize(8).font('Helvetica-Bold').fillColor(C.text)
           .text('UPI ID:', detailX, dy);
         doc.font('Helvetica').fillColor(C.dark)
-          .text(data.businessUpiId, detailX + 80, dy);
+          .text(data.businessUpiId, detailX + 75, dy);
         dy += 14;
       }
 
       if (data.bankAccountNo && data.bankIfsc) {
         if (data.bankAccountName) {
           doc.fontSize(8).font('Helvetica-Bold').fillColor(C.text)
-            .text('Account Name:', detailX, dy);
+            .text('A/C Name:', detailX, dy);
           doc.font('Helvetica').fillColor(C.dark)
-            .text(data.bankAccountName, detailX + 80, dy);
+            .text(data.bankAccountName, detailX + 75, dy);
           dy += 14;
         }
         doc.fontSize(8).font('Helvetica-Bold').fillColor(C.text)
-          .text('Account No:', detailX, dy);
+          .text('A/C No:', detailX, dy);
         doc.font('Helvetica').fillColor(C.dark)
-          .text(data.bankAccountNo, detailX + 80, dy);
+          .text(data.bankAccountNo, detailX + 75, dy);
         dy += 14;
 
         doc.fontSize(8).font('Helvetica-Bold').fillColor(C.text)
           .text('IFSC:', detailX, dy);
         doc.font('Helvetica').fillColor(C.dark)
-          .text(data.bankIfsc, detailX + 80, dy);
+          .text(data.bankIfsc, detailX + 75, dy);
         dy += 14;
 
         if (data.bankName) {
           doc.fontSize(8).font('Helvetica-Bold').fillColor(C.text)
             .text('Bank:', detailX, dy);
           doc.font('Helvetica').fillColor(C.dark)
-            .text(data.bankName, detailX + 80, dy);
+            .text(data.bankName, detailX + 75, dy);
           dy += 14;
         }
       }
@@ -364,14 +375,14 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
       // NOTES
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-      y = Math.max(dy, paymentSectionY + (qrRendered ? 130 : 0)) + 15;
+      y = Math.max(dy, paymentSectionY + (qrRendered ? 120 : 0)) + 12;
       if (data.notes) {
         hline(doc, y, L, R, C.borderLight, 0.5);
-        y += 10;
-        doc.fontSize(8).font('Helvetica-Bold').fillColor(C.secondary)
+        y += 8;
+        doc.fontSize(7.5).font('Helvetica-Bold').fillColor(C.secondary)
           .text('Notes:', L, y);
-        y += 12;
-        doc.fontSize(8).font('Helvetica').fillColor(C.text)
+        y += 11;
+        doc.fontSize(7.5).font('Helvetica').fillColor(C.text)
           .text(data.notes, L, y, { width: W });
       }
 
@@ -379,27 +390,47 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
       // TERMS & CONDITIONS
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-      const termsY = doc.page.height - 90;
+      const termsY = doc.page.height - 95;
       hline(doc, termsY, L, R, C.borderLight, 0.5);
 
-      doc.fontSize(7).font('Helvetica-Bold').fillColor(C.light)
-        .text('Terms & Conditions', L, termsY + 6);
-      doc.fontSize(6.5).font('Helvetica').fillColor(C.light)
-        .text('1. Payment is due by the date mentioned above.', L, termsY + 17)
-        .text('2. Please include the invoice number in your payment reference.', L, termsY + 27)
-        .text('3. This is a computer-generated invoice.', L, termsY + 37);
+      doc.fontSize(6.5).font('Helvetica-Bold').fillColor(C.light)
+        .text('Terms & Conditions', L, termsY + 5);
+      doc.fontSize(6).font('Helvetica').fillColor(C.light)
+        .text('1. Payment is due by the date mentioned above.  2. Please include the invoice number in your payment reference.  3. This is a computer-generated invoice.', L, termsY + 16, { width: W });
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      // FOOTER
+      // FOOTER WITH LOGO
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-      const footerY = doc.page.height - 30;
-      rect(doc, 0, footerY - 5, 612, 35, C.headerBg);
-      doc.fontSize(6.5).font('Helvetica').fillColor(C.light)
-        .text('Generated by BillKaro — WhatsApp-First Smart Invoicing for Indian SMEs', L, footerY + 2, {
-          width: W,
-          align: 'center',
-        });
+      const footerY = doc.page.height - 42;
+      rect(doc, 0, footerY - 8, 612, 50, C.headerBg);
+      hline(doc, footerY - 8, 0, 612, C.borderLight, 0.5);
+
+      // Try to add BillKaro logo
+      const logoPath = getLogoPath();
+      if (logoPath) {
+        try {
+          doc.image(logoPath, L, footerY - 3, { height: 28 });
+          doc.fontSize(6).font('Helvetica').fillColor(C.light)
+            .text('Powered by BillKaro — WhatsApp-First Smart Invoicing', L + 105, footerY + 5, {
+              width: W - 105,
+              align: 'right',
+            });
+        } catch {
+          // Fallback to text only if logo fails
+          doc.fontSize(6.5).font('Helvetica').fillColor(C.light)
+            .text('Powered by BillKaro — WhatsApp-First Smart Invoicing for Indian SMEs', L, footerY + 4, {
+              width: W,
+              align: 'center',
+            });
+        }
+      } else {
+        doc.fontSize(6.5).font('Helvetica').fillColor(C.light)
+          .text('Powered by BillKaro — WhatsApp-First Smart Invoicing for Indian SMEs', L, footerY + 4, {
+            width: W,
+            align: 'center',
+          });
+      }
 
       doc.end();
       logger.info('Professional PDF generated', { invoiceNo: data.invoiceNo });
@@ -410,7 +441,7 @@ export async function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
 }
 
 /**
- * Convert number to Indian English words (simplified)
+ * Convert number to Indian English words
  */
 function numberToWords(num: number): string {
   if (num === 0) return 'Zero';
@@ -434,18 +465,15 @@ function numberToWords(num: number): string {
   }
 
   let result = convert(whole);
-  if (paise > 0) {
-    result += ` and ${convert(paise)} Paise`;
-  }
+  if (paise > 0) result += ` and ${convert(paise)} Paise`;
   return result;
 }
 
 /**
- * Save PDF — uploads to R2 in production, local filesystem in dev
+ * Save PDF — uploads to R2
  */
 export async function savePDF(invoiceNo: string, pdfBuffer: Buffer): Promise<string> {
   const key = `invoices/${invoiceNo}.pdf`;
-
   try {
     const url = await uploadToR2(pdfBuffer, key, 'application/pdf');
     logger.info('PDF saved', { invoiceNo, url });
@@ -456,9 +484,6 @@ export async function savePDF(invoiceNo: string, pdfBuffer: Buffer): Promise<str
   }
 }
 
-/**
- * Legacy local save — kept for backward compatibility
- */
 export async function savePDFLocally(invoiceNo: string, pdfBuffer: Buffer): Promise<string> {
   return savePDF(invoiceNo, pdfBuffer);
 }
