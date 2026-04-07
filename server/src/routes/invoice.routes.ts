@@ -2,7 +2,7 @@ import { prisma } from '../db/prisma';
 import { Router, Response } from 'express';
 import { PrismaClient, InvoiceStatus } from '@prisma/client';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
-import { markInvoicePaid } from '../services/invoice.service';
+import { markInvoicePaid, recordPayment } from '../services/invoice.service';
 import { cancelReminders } from '../services/reminder.service';
 import { sendTextMessage, sendMediaMessage } from '../services/whatsapp.service';
 import { formatCurrency } from '../utils/currency';
@@ -57,6 +57,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
         gstRate: Number(inv.gstRate),
         gstAmount: Number(inv.gstAmount),
         totalAmount: Number(inv.totalAmount),
+        amountPaid: Number((inv as any).amountPaid || 0),
         description: inv.description,
         pdfUrl: inv.pdfUrl,
         paymentLink: inv.paymentLink,
@@ -168,6 +169,55 @@ router.post('/:id/resend', async (req: AuthRequest, res: Response) => {
   } catch (error) {
     logger.error('Resend invoice error', { error });
     res.status(500).json({ success: false, error: 'Failed to resend invoice' });
+  }
+});
+
+// ── Record Partial Payment ────────────────────────────────
+router.patch('/:id/record-payment', async (req: AuthRequest, res: Response) => {
+  try {
+    const { amount, paymentMethod = 'manual', notes } = req.body;
+
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      res.status(400).json({ success: false, error: 'Invalid payment amount' });
+      return;
+    }
+
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: req.params.id as string, userId: req.userId! },
+    });
+
+    if (!invoice) {
+      res.status(404).json({ success: false, error: 'Invoice not found' });
+      return;
+    }
+
+    if (invoice.status === InvoiceStatus.PAID) {
+      res.status(400).json({ success: false, error: 'Invoice is already fully paid' });
+      return;
+    }
+
+    const result = await recordPayment({
+      invoiceId: invoice.id,
+      amount: Number(amount),
+      paymentMethod,
+      notes,
+    });
+
+    if (result.isFullyPaid) {
+      await cancelReminders(invoice.id);
+    }
+
+    res.json({
+      success: true,
+      message: result.isFullyPaid ? 'Invoice fully paid' : 'Partial payment recorded',
+      amountPaid: Number(result.invoice.amountPaid),
+      balanceDue: result.balanceDue,
+      isFullyPaid: result.isFullyPaid,
+      status: result.invoice.status,
+    });
+  } catch (error: any) {
+    logger.error('Record payment error', { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to record payment' });
   }
 });
 

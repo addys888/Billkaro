@@ -175,6 +175,16 @@ async function handleInteractiveReply(phone: string, buttonId: string): Promise<
       // Forward payment type buttons to payment flow
       await handlePaymentButton(phone, buttonId, user);
       break;
+    case 'advance_yes':
+    case 'advance_no':
+      // Could be onboarding OR invoice flow — check session
+      if (session?.currentFlow === 'onboarding') {
+        await handleOnboardingStep(phone, buttonId, user);
+      } else {
+        // Invoice flow advance payment
+        await handleInvoiceFlow(phone, buttonId === 'advance_yes' ? '__ADVANCE_YES__' : '__ADVANCE_NO__', user, session);
+      }
+      break;
     default:
       // Check onboarding buttons (terms_7, terms_15, terms_30, bank_yes, bank_skip)
       if (buttonId.startsWith('terms_') || buttonId.startsWith('bank_')) {

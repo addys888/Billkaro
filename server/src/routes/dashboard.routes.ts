@@ -67,6 +67,11 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
           totalDaysToPay += days;
           paidWithDays++;
         }
+      } else if (inv.status === 'PARTIALLY_PAID') {
+        const paid = Number((inv as any).amountPaid || 0);
+        totalCollected += paid;
+        totalPending += (amount - paid);
+        pendingCount++;
       } else if (inv.status === InvoiceStatus.OVERDUE) {
         totalOverdue += amount;
         overdueCount++;
@@ -75,6 +80,7 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
           invoiceNo: inv.invoiceNo,
           clientName: inv.client.name,
           totalAmount: amount,
+          amountPaid: Number((inv as any).amountPaid || 0),
           daysOverdue: Math.floor(
             (now.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24)
           ),
@@ -91,6 +97,7 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
             invoiceNo: inv.invoiceNo,
             clientName: inv.client.name,
             totalAmount: amount,
+            amountPaid: Number((inv as any).amountPaid || 0),
             daysOverdue: Math.floor(
               (now.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24)
             ),

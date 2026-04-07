@@ -277,8 +277,29 @@ export async function handleOnboardingStep(
 
       await prisma.user.update({
         where: { phone },
+        data: { defaultPaymentTermsDays: days },
+      });
+
+      await updateSession(phone, { currentStep: 'ADVANCE_PAYMENT' });
+
+      await sendButtonMessage({
+        to: phone,
+        bodyText: `✅ Payment terms: ${days} days\n\n6️⃣ Enable *Advance Payment* tracking?\n\n💰 This lets you record partial/advance payments when creating invoices — useful if clients pay some amount upfront.\n\n_Most merchants find this helpful for large orders._`,
+        buttons: [
+          { id: 'advance_yes', title: '✅ Yes, Enable' },
+          { id: 'advance_no', title: '⏭️ No, Skip' },
+        ],
+      });
+      break;
+    }
+
+    case 'ADVANCE_PAYMENT': {
+      const enableAdvance = input === 'advance_yes';
+
+      await prisma.user.update({
+        where: { phone },
         data: {
-          defaultPaymentTermsDays: days,
+          enableAdvancePayment: enableAdvance,
           onboardingComplete: true,
         },
       });
@@ -290,10 +311,11 @@ export async function handleOnboardingStep(
       const bankInfo = user?.bankAccountNo
         ? `\n✅ Bank: ****${user.bankAccountNo.slice(-4)} (${user.bankIfsc})`
         : '';
+      const advanceInfo = enableAdvance ? '\n✅ Advance Payments: Enabled' : '';
 
       await sendTextMessage({
         to: phone,
-        text: `🎉 *All set, ${user?.businessName}!*\n\n✅ Business: ${user?.businessName}\n✅ GSTIN: ${user?.gstin || 'Not set'}\n✅ UPI: ${user?.upiId}${bankInfo}\n✅ Payment Terms: ${days} days\n\n💰 *Zero transaction fees* — money goes straight to your account!\n\n━━━━━━━━━━━━━━━━━━\n\nYou're ready! Just say:\n\n📄 *"Bill 5000 to Rahul for AC repair"*\n\nor send a voice note 🎤`,
+        text: `🎉 *All set, ${user?.businessName}!*\n\n✅ Business: ${user?.businessName}\n✅ GSTIN: ${user?.gstin || 'Not set'}\n✅ UPI: ${user?.upiId}${bankInfo}\n✅ Payment Terms: ${user?.defaultPaymentTermsDays} days${advanceInfo}\n\n💰 *Zero transaction fees* — money goes straight to your account!\n\n━━━━━━━━━━━━━━━━━━\n\nYou're ready! Just say:\n\n📄 *"Bill 5000 to Rahul for AC repair"*\n\nor send a voice note 🎤`,
       });
 
       logger.info('User onboarding complete', { phone: phone.slice(-4), businessName: user?.businessName });

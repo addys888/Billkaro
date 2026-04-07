@@ -62,6 +62,79 @@ export async function handleInvoiceFlow(
     return;
   }
 
+  if (input === '__ADVANCE_YES__') {
+    await updateSession(phone, { currentStep: 'advance_enter_amount' });
+    const total = formatCurrency(session.flowData.parsedInvoice?.amount || 0);
+    await sendTextMessage({
+      to: phone,
+      text: `💰 How much advance did the client pay?\n\nInvoice total: ${total}\n\n_Send the advance amount (e.g. 5000):_`,
+    });
+    return;
+  }
+
+  if (input === '__ADVANCE_NO__') {
+    // Full amount due — show send to client buttons
+    await updateSession(phone, { currentStep: 'invoice_created' });
+    await sendButtonMessage({
+      to: phone,
+      bodyText: '✅ Full amount set as due.\n\n👉 *Forward this to your client?*',
+      buttons: [
+        { id: 'send_to_client', title: '📤 Send to Client' },
+        { id: 'done_invoice', title: '📋 Done' },
+      ],
+    });
+    return;
+  }
+
+  // Handle advance payment amount input
+  if (step === 'advance_enter_amount') {
+    const amount = parseFloat(input.replace(/[₹,\s]/g, ''));
+    const totalAmount = Number(session.flowData.totalAmount || session.flowData.parsedInvoice?.amount || 0);
+    
+    if (isNaN(amount) || amount <= 0) {
+      await sendTextMessage({ to: phone, text: '⚠️ Please enter a valid amount (e.g. 5000).' });
+      return;
+    }
+    if (amount >= totalAmount) {
+      await sendTextMessage({ to: phone, text: `⚠️ Advance (${formatCurrency(amount)}) can\'t be >= total (${formatCurrency(totalAmount)}).\nEnter a smaller amount:` });
+      return;
+    }
+
+    try {
+      const { recordPayment } = await import('../../services/invoice.service');
+      const invoiceId = session.flowData.invoiceId;
+      const result = await recordPayment({ invoiceId, amount, paymentMethod: 'advance' });
+
+      await updateSession(phone, { currentStep: 'invoice_created' });
+
+      await sendTextMessage({
+        to: phone,
+        text: [
+          `✅ *Advance Payment Recorded!*`,
+          `━━━━━━━━━━━━━━━━━━`,
+          `💵 Advance: ${formatCurrency(amount)}`,
+          `📊 Balance due: *${formatCurrency(result.balanceDue)}*`,
+          `📊 Status: *Partially Paid* 🟡`,
+          '',
+          '👉 *Forward invoice to your client?*',
+        ].join('\n'),
+      });
+
+      await sendButtonMessage({
+        to: phone,
+        bodyText: 'What next?',
+        buttons: [
+          { id: 'send_to_client', title: '📤 Send to Client' },
+          { id: 'done_invoice', title: '📋 Done' },
+        ],
+      });
+    } catch (err: any) {
+      logger.error('Advance payment failed', { error: err.message });
+      await sendTextMessage({ to: phone, text: '❌ Failed to record advance. Please try again.' });
+    }
+    return;
+  }
+
   // ── Handle edit sub-steps ──
   if (step === 'edit_choice') {
     if (input === 'edit_amount') {
@@ -260,14 +333,40 @@ async function confirmAndSendInvoice(
       '👉 *Forward this to your client?*',
     ].filter(Boolean).join('\n');
 
-    await sendButtonMessage({
-      to: phone,
-      bodyText: successMsg,
-      buttons: [
-        { id: 'send_to_client', title: '📤 Send to Client' },
-        { id: 'done_invoice', title: '📋 Done' },
-      ],
-    });
+    // Check if merchant has advance payment enabled
+    
+    if (freshUser?.enableAdvancePayment) {
+      // Store total for advance amount validation
+      await updateSession(phone, {
+        currentStep: 'advance_choice',
+        flowData: {
+          ...session.flowData,
+          invoiceId: result.id,
+          invoiceNo: result.invoiceNo,
+          totalAmount: result.totalAmount,
+          pdfUrl: result.pdfUrl,
+          paymentLink: result.paymentLink,
+        },
+      });
+
+      await sendButtonMessage({
+        to: phone,
+        bodyText: successMsg + '\n\n💰 Did the client make an advance payment?',
+        buttons: [
+          { id: 'advance_yes', title: '💰 Record Advance' },
+          { id: 'advance_no', title: '📋 Full Amount Due' },
+        ],
+      });
+    } else {
+      await sendButtonMessage({
+        to: phone,
+        bodyText: successMsg,
+        buttons: [
+          { id: 'send_to_client', title: '📤 Send to Client' },
+          { id: 'done_invoice', title: '📋 Done' },
+        ],
+      });
+    }
 
     // Send PDF as document attachment via WhatsApp media upload
     if (result.pdfBuffer) {
