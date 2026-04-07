@@ -6,7 +6,7 @@ import { transcribeVoiceNote } from '../services/voice.service';
 import { getSession } from './session-manager';
 import { handleOnboardingStep } from './flows/onboarding.flow';
 import { handleInvoiceFlow } from './flows/invoice.flow';
-import { handleCommand } from './flows/command.flow';
+import { handleCommand, handlePaymentButton } from './flows/command.flow';
 import { logger } from '../utils/logger';
 
 
@@ -169,6 +169,11 @@ async function handleInteractiveReply(phone: string, buttonId: string): Promise<
     case 'edit_items':
       // Forward edit sub-menu button IDs directly to invoice flow
       await handleInvoiceFlow(phone, buttonId, user, session);
+      break;
+    case 'pay_full':
+    case 'pay_partial':
+      // Forward payment type buttons to payment flow
+      await handlePaymentButton(phone, buttonId, user);
       break;
     default:
       // Check onboarding buttons (terms_7, terms_15, terms_30, bank_yes, bank_skip)

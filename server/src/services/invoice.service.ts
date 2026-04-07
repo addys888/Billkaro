@@ -159,41 +159,136 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
 }
 
 /**
- * Mark an invoice as paid
+ * Record a payment (partial or full) against an invoice
+ */
+export async function recordPayment(params: {
+  invoiceId: string;
+  amount: number;
+  paymentMethod?: string;
+  transactionId?: string;
+  notes?: string;
+}): Promise<{
+  invoice: any;
+  payment: any;
+  isFullyPaid: boolean;
+  balanceDue: number;
+}> {
+  const { invoiceId, amount, paymentMethod, transactionId, notes } = params;
+
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: invoiceId },
+    include: { client: true },
+  });
+
+  if (!invoice) throw new Error('Invoice not found');
+
+  const totalAmount = Number(invoice.totalAmount);
+  const currentPaid = Number(invoice.amountPaid);
+  const balanceBefore = totalAmount - currentPaid;
+
+  // Cap payment at balance due (no overpayments)
+  const paymentAmount = Math.min(amount, balanceBefore);
+  if (paymentAmount <= 0) {
+    throw new Error('Invoice is already fully paid');
+  }
+
+  const newAmountPaid = currentPaid + paymentAmount;
+  const isFullyPaid = newAmountPaid >= totalAmount;
+  const balanceDue = Math.max(0, totalAmount - newAmountPaid);
+
+  // Create payment record
+  const payment = await prisma.payment.create({
+    data: {
+      invoiceId,
+      amount: paymentAmount,
+      paymentMethod: paymentMethod || 'manual',
+      transactionId,
+      notes,
+    },
+  });
+
+  // Update invoice
+  const updatedInvoice = await prisma.invoice.update({
+    where: { id: invoiceId },
+    data: {
+      amountPaid: newAmountPaid,
+      status: isFullyPaid ? InvoiceStatus.PAID : InvoiceStatus.PARTIALLY_PAID,
+      paidAt: isFullyPaid ? new Date() : undefined,
+      paymentMethod: isFullyPaid ? (paymentMethod || 'manual') : undefined,
+    },
+    include: { client: true, payments: true },
+  });
+
+  // Update client payment stats
+  await prisma.client.update({
+    where: { id: invoice.clientId },
+    data: {
+      totalPaid: { increment: paymentAmount },
+    },
+  });
+
+  // Recalculate client payment score if fully paid
+  if (isFullyPaid) {
+    await recalculatePaymentScore(invoice.clientId);
+  }
+
+  logger.info('Payment recorded', {
+    invoiceNo: invoice.invoiceNo,
+    paymentAmount,
+    totalPaid: newAmountPaid,
+    balanceDue,
+    isFullyPaid,
+  });
+
+  return { invoice: updatedInvoice, payment, isFullyPaid, balanceDue };
+}
+
+/**
+ * Mark an invoice as fully paid (convenience wrapper)
  */
 export async function markInvoicePaid(
   invoiceId: string,
   paymentMethod: string = 'manual',
   transactionId?: string
 ): Promise<void> {
-  const invoice = await prisma.invoice.update({
-    where: { id: invoiceId },
-    data: {
-      status: InvoiceStatus.PAID,
-      paidAt: new Date(),
-      paymentMethod,
-      transactionId,
-    },
-    include: { client: true },
+  const invoice = await prisma.invoice.findUnique({ where: { id: invoiceId } });
+  if (!invoice) throw new Error('Invoice not found');
+
+  const balanceDue = Number(invoice.totalAmount) - Number(invoice.amountPaid);
+  await recordPayment({
+    invoiceId,
+    amount: balanceDue,
+    paymentMethod,
+    transactionId,
   });
+}
 
-  // Update client payment stats
-  const totalAmount = Number(invoice.totalAmount);
-  const daysToPayCalc = Math.max(0, Math.floor(
-    (new Date().getTime() - invoice.createdAt.getTime()) / (1000 * 60 * 60 * 24)
-  ));
-
-  await prisma.client.update({
-    where: { id: invoice.clientId },
-    data: {
-      totalPaid: { increment: totalAmount },
-    },
+/**
+ * Get payment history for an invoice
+ */
+export async function getPaymentHistory(invoiceId: string) {
+  return prisma.payment.findMany({
+    where: { invoiceId },
+    orderBy: { paidAt: 'desc' },
   });
+}
 
-  // Recalculate client payment score
-  await recalculatePaymentScore(invoice.clientId);
-
-  logger.info('Invoice marked as paid', { invoiceNo: invoice.invoiceNo, paymentMethod });
+/**
+ * Find pending/partially-paid invoices for a client by name
+ */
+export async function findPendingInvoicesForClient(
+  userId: string,
+  clientName: string
+): Promise<any[]> {
+  return prisma.invoice.findMany({
+    where: {
+      userId,
+      status: { in: [InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE] },
+      client: { name: { contains: clientName, mode: 'insensitive' } },
+    },
+    include: { client: true, payments: true },
+    orderBy: { createdAt: 'desc' },
+  });
 }
 
 /**
