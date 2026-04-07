@@ -105,11 +105,38 @@ export async function handleOnboardingStep(
         data: { gstin },
       });
 
+      await updateSession(phone, { currentStep: 'BUSINESS_ADDRESS' });
+
+      await sendTextMessage({
+        to: phone,
+        text: `${gstin ? '✅ GSTIN saved!' : '✅ Skipped GSTIN.'}\n\n3️⃣ What is your *Business Address*?\n\n(e.g., "123 MG Road, Basti, UP 272001")\n\nType "skip" if you want to add it later.`,
+      });
+      break;
+    }
+
+    case 'BUSINESS_ADDRESS': {
+      let address: string | null = null;
+      if (input.toLowerCase() !== 'skip') {
+        address = input.trim();
+        if (address.length < 5) {
+          await sendTextMessage({
+            to: phone,
+            text: '⚠️ Please enter a valid address (at least 5 characters) or type "skip".',
+          });
+          return;
+        }
+      }
+
+      await prisma.user.update({
+        where: { phone },
+        data: { businessAddress: address },
+      });
+
       await updateSession(phone, { currentStep: 'UPI_ID' });
 
       await sendTextMessage({
         to: phone,
-        text: `${gstin ? '✅ GSTIN saved!' : '✅ Skipped GSTIN.'}\n\n3️⃣ What is your *UPI ID* for receiving payments?\n\n(e.g., yourname@paytm, yourname@upi)\n\n💡 This is where your clients' money will land — *zero transaction fees!*`,
+        text: `${address ? '✅ Address saved!' : '✅ Skipped address.'}\n\n4️⃣ What is your *UPI ID* for receiving payments?\n\n(e.g., yourname@paytm, yourname@upi)\n\n💡 This is where your clients' money will land — *zero transaction fees!*`,
       });
       break;
     }

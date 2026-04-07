@@ -41,6 +41,7 @@ model Client {
   userId                 String    @map("user_id")
   name                   String
   phone                  String?
+  address                String?
   gstin                  String?
   email                  String?
   paymentScore           Decimal   @default(5.00) @map("payment_score") @db.Decimal(3, 2)
