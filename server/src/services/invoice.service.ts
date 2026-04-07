@@ -79,11 +79,12 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
     },
   });
 
-  // Generate PDF
+  // Generate PDF (with hard timeout — Puppeteer can hang on low-memory containers)
   let pdfUrl = '';
   let pdfBuf: Buffer | undefined;
   try {
-    pdfBuf = await generateInvoicePDF({
+    const PDF_TIMEOUT_MS = 30000; // 30 seconds max
+    const pdfPromise = generateInvoicePDF({
       invoiceNo,
       createdAt: invoice.createdAt,
       dueDate,
@@ -107,9 +108,15 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
       notes: notes || undefined,
     });
 
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('PDF generation timed out after 30s')), PDF_TIMEOUT_MS)
+    );
+
+    pdfBuf = await Promise.race([pdfPromise, timeoutPromise]);
     pdfUrl = await savePDFLocally(invoiceNo, pdfBuf);
-  } catch (error) {
-    logger.error('PDF generation failed for invoice', { invoiceNo, error });
+  } catch (error: any) {
+    logger.error('PDF generation failed for invoice', { invoiceNo, errorMessage: error?.message });
+    // Invoice is still created — PDF will be missing but invoice is functional
   }
 
   // Generate UPI payment link (zero MDR — money goes directly to merchant's bank)
