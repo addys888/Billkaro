@@ -11,6 +11,7 @@ interface Invoice {
   clientName: string;
   clientPhone: string | null;
   totalAmount: number;
+  amountPaid: number;
   description: string | null;
   pdfUrl: string | null;
   paymentLink: string | null;
@@ -78,6 +79,32 @@ export default function InvoicesPage() {
     }
   };
 
+  const handleRecordPayment = async (inv: Invoice) => {
+    const balance = inv.totalAmount - inv.amountPaid;
+    const input = prompt(
+      `Record payment for ${inv.invoiceNo}\n\nTotal: ₹${inv.totalAmount.toLocaleString('en-IN')}\nPaid: ₹${inv.amountPaid.toLocaleString('en-IN')}\nBalance: ₹${balance.toLocaleString('en-IN')}\n\nEnter payment amount:`
+    );
+    if (!input) return;
+    const amount = parseFloat(input.replace(/[₹,\s]/g, ''));
+    if (isNaN(amount) || amount <= 0) {
+      alert('Invalid amount');
+      return;
+    }
+    if (amount > balance) {
+      alert(`Amount cannot exceed balance of ₹${balance.toLocaleString('en-IN')}`);
+      return;
+    }
+    try {
+      await apiFetch(`/api/invoices/${inv.id}/record-payment`, {
+        method: 'PATCH',
+        body: JSON.stringify({ amount, paymentMethod: 'manual' }),
+      });
+      loadInvoices();
+    } catch (error) {
+      alert('Failed to record payment');
+    }
+  };
+
   return (
     <div>
       <div className="main-header">
@@ -110,6 +137,7 @@ export default function InvoicesPage() {
         >
           <option value="all">All Status</option>
           <option value="pending">⏳ Pending</option>
+          <option value="partially_paid">🟡 Partially Paid</option>
           <option value="paid">✅ Paid</option>
           <option value="overdue">🔴 Overdue</option>
           <option value="cancelled">❌ Cancelled</option>
@@ -125,6 +153,7 @@ export default function InvoicesPage() {
                 <th>Invoice #</th>
                 <th>Client</th>
                 <th>Amount</th>
+                <th>Paid</th>
                 <th>Status</th>
                 <th>Date</th>
                 <th>Due Date</th>
@@ -153,6 +182,20 @@ export default function InvoicesPage() {
                         )}
                       </td>
                       <td style={{ fontWeight: 700 }}>{formatCurrency(inv.totalAmount)}</td>
+                      <td>
+                        {inv.amountPaid > 0 ? (
+                          <div className="payment-progress">
+                            <div className="progress-bar">
+                              <div className="fill" style={{ width: `${Math.min(100, (inv.amountPaid / inv.totalAmount) * 100)}%` }} />
+                            </div>
+                            <div className="progress-text">
+                              {formatCurrency(inv.amountPaid)} / {formatCurrency(inv.totalAmount)}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted">—</span>
+                        )}
+                      </td>
                       <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                       <td className="text-sm text-secondary">{formatDate(inv.createdAt)}</td>
                       <td className="text-sm text-secondary">{formatDate(inv.dueDate)}</td>
@@ -161,10 +204,10 @@ export default function InvoicesPage() {
                           {inv.status !== 'PAID' && (
                             <button
                               className="btn btn-sm btn-outline"
-                              onClick={() => handleMarkPaid(inv.id)}
-                              title="Mark as paid"
+                              onClick={() => handleRecordPayment(inv)}
+                              title="Record Payment"
                             >
-                              ✅
+                              💰
                             </button>
                           )}
                           <button
@@ -176,7 +219,7 @@ export default function InvoicesPage() {
                           </button>
                           {inv.pdfUrl && (
                             <a
-                              href={`${process.env.NEXT_PUBLIC_API_URL}${inv.pdfUrl}`}
+                              href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}${inv.pdfUrl}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="btn btn-sm btn-outline"
@@ -192,7 +235,7 @@ export default function InvoicesPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={8}>
                     <div className="empty-state">
                       <div className="icon">📄</div>
                       <h3>No invoices found</h3>

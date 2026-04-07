@@ -79,8 +79,9 @@ export function getStarRating(score: number): { filled: number; empty: number } 
  */
 export function getStatusBadge(status: string): { className: string; label: string } {
   switch (status.toUpperCase()) {
-    case 'PAID': return { className: 'badge-success', label: 'Paid' };
+    case 'PAID': return { className: 'badge-success', label: 'Paid ✅' };
     case 'PENDING': return { className: 'badge-warning', label: 'Pending' };
+    case 'PARTIALLY_PAID': return { className: 'badge-partial', label: 'Partial 🟡' };
     case 'OVERDUE': return { className: 'badge-danger', label: 'Overdue' };
     case 'CANCELLED': return { className: 'badge-info', label: 'Cancelled' };
     default: return { className: 'badge-info', label: status };
