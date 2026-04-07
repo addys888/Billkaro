@@ -1,17 +1,10 @@
 FROM node:20-slim
 
-# Install Chromium dependencies for Puppeteer PDF generation
+# Install minimal dependencies (no Chromium needed — using PDFKit for PDF generation)
 RUN apt-get update && apt-get install -y \
-    chromium \
-    fonts-noto \
-    fonts-noto-color-emoji \
-    fonts-noto-cjk \
+    openssl \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
-
-# Tell Puppeteer to use system Chromium instead of downloading its own
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /app
 
@@ -28,7 +21,7 @@ COPY . .
 RUN npm run build
 
 # Copy non-TypeScript assets to dist
-RUN cp -r src/templates dist/templates
+RUN cp -r src/templates dist/templates 2>/dev/null || true
 
 # Clean up devDependencies
 RUN npm prune --production
