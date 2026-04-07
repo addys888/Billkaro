@@ -300,8 +300,15 @@ async function confirmAndSendInvoice(
       dueDays: parsed.dueDays || undefined,
     });
 
-    // Schedule payment reminders
-    await scheduleReminders(result.id);
+    // Schedule payment reminders (non-fatal — don't crash invoice creation)
+    try {
+      await scheduleReminders(result.id);
+    } catch (reminderError: any) {
+      logger.warn('Failed to schedule reminders (Redis not available?)', {
+        invoiceId: result.id,
+        error: reminderError?.message,
+      });
+    }
 
     // Store invoice ID in session for follow-up
     await updateSession(phone, {

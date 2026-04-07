@@ -11,12 +11,29 @@ import { logger } from '../utils/logger';
 
 
 
-const connection = new IORedis(config.REDIS_URL, {
-  maxRetriesPerRequest: null,
-});
+let connection: any = null;
+let reminderQueue: any = null;
 
-// Create the reminder queue
-const reminderQueue = new Queue('reminders', { connection });
+try {
+  if (config.REDIS_URL) {
+    connection = new IORedis(config.REDIS_URL, {
+      maxRetriesPerRequest: null,
+      retryStrategy: (times: number) => {
+        if (times > 2) return null;
+        return Math.min(times * 100, 1000);
+      },
+      lazyConnect: true,
+    });
+    connection.connect().catch(() => {
+      logger.warn('Redis not available for reminder queue');
+      connection = null;
+      reminderQueue = null;
+    });
+    reminderQueue = new Queue('reminders', { connection });
+  }
+} catch (err: any) {
+  logger.warn('Reminder queue disabled (no Redis)', { error: err.message });
+}
 
 /**
  * Schedule all reminders for a newly created invoice
@@ -56,24 +73,26 @@ export async function scheduleReminders(invoiceId: string): Promise<void> {
       },
     });
 
-    // Add to BullMQ queue with delay
-    const job = await reminderQueue.add(
-      'send-reminder',
-      { reminderId: reminder.id, invoiceId },
-      {
-        delay,
-        removeOnComplete: true,
-        removeOnFail: false,
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 60000 },
-      }
-    );
+    // Add to BullMQ queue with delay (if Redis available)
+    if (reminderQueue) {
+      const job = await reminderQueue.add(
+        'send-reminder',
+        { reminderId: reminder.id, invoiceId },
+        {
+          delay,
+          removeOnComplete: true,
+          removeOnFail: false,
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 60000 },
+        }
+      );
 
-    // Save job ID for cancellation
-    await prisma.reminder.update({
-      where: { id: reminder.id },
-      data: { bullJobId: job.id },
-    });
+      // Save job ID for cancellation
+      await prisma.reminder.update({
+        where: { id: reminder.id },
+        data: { bullJobId: job.id },
+      });
+    }
   }
 
   logger.info('Reminders scheduled', { invoiceId, count: reminderTypes.length });
