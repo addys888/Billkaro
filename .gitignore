@@ -37,7 +37,6 @@ coverage/
 
 # Prisma
 server/prisma/*.db
-server/prisma/migrations/
 
 # Generated
 server/src/generated/

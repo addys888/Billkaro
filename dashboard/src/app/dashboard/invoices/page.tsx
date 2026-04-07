@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '@/lib/api';
 import { formatCurrency, formatDate, getStatusBadge } from '@/lib/utils';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
 interface Invoice {
   id: string;
   invoiceNo: string;
@@ -70,12 +72,16 @@ export default function InvoicesPage() {
     }
   };
 
-  const handleResend = async (invoiceId: string) => {
+  const handleResend = async (inv: Invoice) => {
+    if (!inv.clientPhone) {
+      alert(`Cannot resend — ${inv.clientName} has no phone number saved.\n\nThey were created via voice invoice without a phone.`);
+      return;
+    }
     try {
-      await apiFetch(`/api/invoices/${invoiceId}/resend`, { method: 'POST' });
-      alert('Invoice resent via WhatsApp!');
-    } catch (error) {
-      alert('Failed to resend invoice');
+      await apiFetch(`/api/invoices/${inv.id}/resend`, { method: 'POST' });
+      alert(`✅ Invoice resent to ${inv.clientName} via WhatsApp!`);
+    } catch (error: any) {
+      alert(error.message || 'Failed to resend invoice');
     }
   };
 
@@ -205,21 +211,23 @@ export default function InvoicesPage() {
                             <button
                               className="btn btn-sm btn-outline"
                               onClick={() => handleRecordPayment(inv)}
-                              title="Record Payment"
+                              title={`Record payment for ${inv.invoiceNo}`}
+                              style={{ fontSize: '0.75rem' }}
                             >
-                              💰
+                              💰 Pay
                             </button>
                           )}
                           <button
                             className="btn btn-sm btn-outline"
-                            onClick={() => handleResend(inv.id)}
-                            title="Resend to client"
+                            onClick={() => handleResend(inv)}
+                            title={inv.clientPhone ? `Resend to ${inv.clientName}` : `No phone for ${inv.clientName}`}
+                            style={{ opacity: inv.clientPhone ? 1 : 0.5 }}
                           >
                             📤
                           </button>
                           {inv.pdfUrl && (
                             <a
-                              href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}${inv.pdfUrl}`}
+                              href={inv.pdfUrl.startsWith('http') ? inv.pdfUrl : `${API_BASE}${inv.pdfUrl}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="btn btn-sm btn-outline"
