@@ -78,6 +78,16 @@ export async function handleIncomingMessage(message: any, senderPhone: string): 
 
     // Check if this is a new user who needs onboarding
     const user = await prisma.user.findUnique({ where: { phone: senderPhone } });
+    
+    // Block suspended users
+    if (user && user.isSuspended) {
+      await sendTextMessage({
+        to: senderPhone,
+        text: '🚫 *Account Suspended*\n\nYour BillKaro account is currently suspended. Access to both the dashboard and WhatsApp bot is restricted.\n\nPlease contact the administrator for more information.',
+      });
+      return;
+    }
+
     if (!user || !user.onboardingComplete) {
       await handleOnboardingStep(senderPhone, text, user);
       return;
@@ -133,7 +143,7 @@ export async function handleIncomingMessage(message: any, senderPhone: string): 
  */
 async function handleInteractiveReply(phone: string, buttonId: string): Promise<void> {
   const user = await prisma.user.findUnique({ where: { phone } });
-  if (!user) return;
+  if (!user || user.isSuspended) return;
 
   const session = await getSession(phone);
 

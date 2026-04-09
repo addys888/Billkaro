@@ -29,6 +29,14 @@ router.post('/send-otp', async (req: Request, res: Response) => {
       return;
     }
 
+    if (user.isSuspended) {
+      res.status(403).json({ 
+        success: false, 
+        error: 'Your account has been suspended. Please contact support for assistance.' 
+      });
+      return;
+    }
+
     await sendOTP(normalizedPhone);
 
     res.json({ success: true, message: 'OTP sent via WhatsApp' });
