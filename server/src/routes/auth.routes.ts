@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { sendOTP, verifyOTP } from '../services/auth.service';
 import { logger } from '../utils/logger';
+import { prisma } from '../db/prisma';
+import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -61,9 +63,6 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, error: 'OTP verification failed' });
   }
 });
-
-import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
-import { prisma } from '../db/prisma';
 
 // ── Get Current Profile ───────────────────────────────────
 router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
