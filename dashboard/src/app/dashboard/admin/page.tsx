@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
-import { ShieldCheck, Calendar, Phone, TrendingUp, Users, FileText, Activity } from 'lucide-react';
+import { ShieldCheck, Calendar, Phone, TrendingUp, Users, FileText, Activity, Search } from 'lucide-react';
 import { formatDate, formatCurrency, formatNumber } from '@/lib/utils';
 
 export default function AdminPage() {
@@ -105,18 +105,20 @@ export default function AdminPage() {
       </div>
 
       <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-          <h3 style={{ margin: 0, fontSize: '16px' }}>Client Management</h3>
-          <div style={{ position: 'relative', width: '300px' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Business Management</h3>
+          <div style={{ position: 'relative', flex: '1', maxWidth: '360px' }}>
             <input 
               type="text" 
               placeholder="Search by name or phone..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="form-input"
-              style={{ paddingLeft: '36px', height: '40px', fontSize: '13px' }}
+              style={{ paddingLeft: '40px', height: '42px', fontSize: '14px', width: '100%', background: 'rgba(255,255,255,0.03)' }}
             />
-            <div style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}>⌕</div>
+            <div style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', opacity: 0.4 }}>
+              <Search size={18} />
+            </div>
           </div>
         </div>
 
@@ -125,9 +127,9 @@ export default function AdminPage() {
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--color-border)' }}>
                 <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>Business</th>
-                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>Plan / Status</th>
-                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>Expiry</th>
-                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, textAlign: 'right' }}>Actions</th>
+                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, width: '180px' }}>Plan / Status</th>
+                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, width: '150px' }}>Expiry</th>
+                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, textAlign: 'right', width: '220px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -238,17 +240,19 @@ export default function AdminPage() {
         }
         .action-dropdown-container { position: relative; }
         .dropdown-menu {
-          position: absolute; right: 0; top: calc(100% + 5px);
-          background: #0D150D; border: 1px solid var(--color-border);
-          border-radius: 8px; width: 140px; display: none; flex-direction: column;
-          z-index: 10; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+          position: absolute; right: 0; top: 100%;
+          background: #121A12; border: 1px solid var(--color-border);
+          border-radius: 12px; width: 160px; display: none; flex-direction: column;
+          z-index: 50; box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+          padding: 6px; margin-top: 4px; border: 1px solid rgba(37, 211, 102, 0.2);
         }
         .action-dropdown-container:hover .dropdown-menu { display: flex; }
         .dropdown-menu button {
           padding: 10px 14px; background: none; border: none; color: #E8E8F0;
-          text-align: left; font-size: 13px; cursor: pointer; transition: background 0.2s;
+          text-align: left; font-size: 13px; cursor: pointer; transition: all 0.2s;
+          border-radius: 8px;
         }
-        .dropdown-menu button:hover { background: rgba(37, 211, 102, 0.1); color: var(--color-primary); }
+        .dropdown-menu button:hover { background: rgba(37, 211, 102, 0.15); color: #25D366; }
         .btn-danger { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
         .btn-danger:hover { background: #ef4444; color: white; }
       `}</style>
