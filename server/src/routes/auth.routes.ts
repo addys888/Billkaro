@@ -16,8 +16,13 @@ router.post('/send-otp', async (req: Request, res: Response) => {
       return;
     }
 
-    // Normalize phone (ensure starts with 91)
-    const normalizedPhone = phone.startsWith('91') ? phone : `91${phone}`;
+    // Normalize phone (handle 91 prefix and potential 9191 errors)
+    let normalizedPhone = phone.replace(/\D/g, '');
+    if (normalizedPhone.startsWith('9191')) {
+      normalizedPhone = normalizedPhone.substring(2);
+    } else if (!normalizedPhone.startsWith('91')) {
+      normalizedPhone = `91${normalizedPhone}`;
+    }
 
     // Check if user exists
     const user = await prisma.user.findUnique({ where: { phone: normalizedPhone } });
@@ -56,7 +61,12 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
       return;
     }
 
-    const normalizedPhone = phone.startsWith('91') ? phone : `91${phone}`;
+    let normalizedPhone = phone.replace(/\D/g, '');
+    if (normalizedPhone.startsWith('9191')) {
+      normalizedPhone = normalizedPhone.substring(2);
+    } else if (!normalizedPhone.startsWith('91')) {
+      normalizedPhone = `91${normalizedPhone}`;
+    }
 
     const result = await verifyOTP(normalizedPhone, otp);
 

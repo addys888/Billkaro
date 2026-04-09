@@ -115,7 +115,11 @@ export default function LoginPage() {
                   type="tel"
                   placeholder="Enter 10-digit number"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  onChange={(e) => {
+                    let val = e.target.value.replace(/\D/g, '');
+                    if (val.startsWith('91')) val = val.substring(2);
+                    setPhone(val.slice(0, 10));
+                  }}
                   maxLength={10}
                   autoFocus
                   id="phone-input"
