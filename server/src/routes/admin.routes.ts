@@ -41,7 +41,7 @@ router.get('/users', async (req: AuthRequest, res: Response) => {
  */
 router.patch('/users/:id/subscription', async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { daysToAdd, expiresAt } = req.body;
 
     let updateData: any = {};
