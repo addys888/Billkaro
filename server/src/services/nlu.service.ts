@@ -14,6 +14,7 @@ export interface ParsedInvoice {
   }>;
   notes: string | null;
   dueDays: number | null;
+  gstRate: number | null;
 }
 
 const SYSTEM_PROMPT = `You are an invoice data extractor for Indian SMEs. Extract structured invoice data from natural language input (Hindi, English, or Hinglish).
@@ -24,7 +25,8 @@ Always return a JSON object with these fields:
   "amount": number,
   "items": [{"name": string, "quantity": number, "rate": number}],
   "notes": string | null,
-  "dueDays": number | null
+  "dueDays": number | null,
+  "gstRate": number | null
 }
 
 Rules:
@@ -32,19 +34,23 @@ Rules:
 - If no quantity mentioned, assume 1
 - If no rate mentioned, use the total amount as the single line item rate
 - "dueDays" only if explicitly mentioned, otherwise null
+- "gstRate" only if explicitly mentioned (e.g. "5% GST", "GST 12%", "no GST", "zero GST"). In India, valid GST rates are 0, 5, 12, 18, 28. If user says "no GST" or "without GST" or "GST exempt", set gstRate to 0. If not mentioned at all, set to null.
 - If multiple items mentioned without individual rates, split equally
 - Clean up item names to be professional (capitalize, remove slang)
 - Return ONLY valid JSON, no explanation, no markdown
 
 Examples:
 Input: "Bill 5000 to Rahul for AC repair"
-Output: {"clientName":"Rahul","amount":5000,"items":[{"name":"AC Repair","quantity":1,"rate":5000}],"notes":null,"dueDays":null}
+Output: {"clientName":"Rahul","amount":5000,"items":[{"name":"AC Repair","quantity":1,"rate":5000}],"notes":null,"dueDays":null,"gstRate":null}
 
 Input: "Priya ko 15000 ka bill, 10 CCTV camera install at 1500 each"
-Output: {"clientName":"Priya","amount":15000,"items":[{"name":"CCTV Camera Installation","quantity":10,"rate":1500}],"notes":null,"dueDays":null}
+Output: {"clientName":"Priya","amount":15000,"items":[{"name":"CCTV Camera Installation","quantity":10,"rate":1500}],"notes":null,"dueDays":null,"gstRate":null}
 
-Input: "Sharma ji ko bill bhejo 25000, solar panel fitting ka kaam, Sector 12, due in 10 days"
-Output: {"clientName":"Sharma Ji","amount":25000,"items":[{"name":"Solar Panel Fitting","quantity":1,"rate":25000}],"notes":"Sector 12","dueDays":10}`;
+Input: "Bill 8000 to Sharma ji for groceries at 5% GST"
+Output: {"clientName":"Sharma Ji","amount":8000,"items":[{"name":"Groceries","quantity":1,"rate":8000}],"notes":null,"dueDays":null,"gstRate":5}
+
+Input: "Rahul ko 50000 ka bill without GST, consulting fees"
+Output: {"clientName":"Rahul","amount":50000,"items":[{"name":"Consulting Fees","quantity":1,"rate":50000}],"notes":null,"dueDays":null,"gstRate":0}`;
 
 /**
  * Parse a natural language invoice request into structured data

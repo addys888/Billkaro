@@ -167,6 +167,7 @@ async function handleInteractiveReply(phone: string, buttonId: string): Promise<
     case 'edit_amount':
     case 'edit_client':
     case 'edit_items':
+    case 'edit_gst':
       // Forward edit sub-menu button IDs directly to invoice flow
       await handleInvoiceFlow(phone, buttonId, user, session);
       break;

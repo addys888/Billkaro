@@ -18,6 +18,7 @@ interface CreateInvoiceParams {
   items: Array<{ name: string; quantity: number; rate: number }>;
   notes?: string;
   dueDays?: number;
+  gstRate?: number;
 }
 
 interface InvoiceResult {
@@ -34,7 +35,7 @@ interface InvoiceResult {
  * Create a complete invoice: DB record + PDF + payment link
  */
 export async function createInvoice(params: CreateInvoiceParams): Promise<InvoiceResult> {
-  const { userId, clientName, clientPhone, amount, items, notes, dueDays } = params;
+  const { userId, clientName, clientPhone, amount, items, notes, dueDays, gstRate: customGstRate } = params;
 
   // Get user details
   const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -43,8 +44,8 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
   // Find or create client
   let client = await findOrCreateClient(userId, clientName, clientPhone);
 
-  // Calculate amounts
-  const gstRate = Number(user.defaultGstRate);
+  // Calculate amounts — use custom GST rate if provided, otherwise merchant's default
+  const gstRate = customGstRate != null ? customGstRate : Number(user.defaultGstRate);
   const subtotal = amount;
   const gstAmount = Math.round((subtotal * gstRate) / 100 * 100) / 100;
   const totalAmount = subtotal + gstAmount;

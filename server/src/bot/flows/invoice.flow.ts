@@ -51,7 +51,7 @@ export async function handleInvoiceFlow(
       buttons: [
         { id: 'edit_amount', title: '💰 Amount' },
         { id: 'edit_client', title: '👤 Client' },
-        { id: 'edit_items', title: '📝 Items' },
+        { id: 'edit_gst', title: '🏷️ GST Rate' },
       ],
     });
     return;
@@ -152,6 +152,14 @@ export async function handleInvoiceFlow(
       await sendTextMessage({ to: phone, text: 'Send the new item description:' });
       return;
     }
+    if (input === 'edit_gst') {
+      await updateSession(phone, { currentStep: 'edit_gst' });
+      await sendTextMessage({
+        to: phone,
+        text: '🏷️ Enter the GST rate for this invoice:\n\nValid rates: *0%*, *5%*, *12%*, *18%*, *28%*\n\n_Send just the number (e.g. 5, 12, 18):_',
+      });
+      return;
+    }
   }
 
   if (step === 'edit_amount') {
@@ -185,6 +193,27 @@ export async function handleInvoiceFlow(
   if (step === 'edit_items') {
     const parsed = session.flowData.parsedInvoice as ParsedInvoice;
     parsed.items = [{ name: input.trim(), quantity: 1, rate: parsed.amount }];
+    await updateSession(phone, {
+      currentStep: 'confirm',
+      flowData: { ...session.flowData, parsedInvoice: parsed },
+    });
+    await sendConfirmationCard(phone, parsed, user);
+    return;
+  }
+
+  // Handle GST rate edit
+  if (step === 'edit_gst') {
+    const rate = parseFloat(input.replace(/[%]/g, '').trim());
+    const validRates = [0, 5, 12, 18, 28];
+    if (isNaN(rate) || !validRates.includes(rate)) {
+      await sendTextMessage({
+        to: phone,
+        text: '⚠️ Please enter a valid GST rate: *0*, *5*, *12*, *18*, or *28*',
+      });
+      return;
+    }
+    const parsed = session.flowData.parsedInvoice as ParsedInvoice;
+    parsed.gstRate = rate;
     await updateSession(phone, {
       currentStep: 'confirm',
       flowData: { ...session.flowData, parsedInvoice: parsed },
@@ -241,7 +270,8 @@ async function sendConfirmationCard(
   parsed: ParsedInvoice,
   user: User
 ): Promise<void> {
-  const gstRate = Number(user.defaultGstRate);
+  // Use NLU-parsed GST rate if available, otherwise merchant's default
+  const gstRate = parsed.gstRate != null ? parsed.gstRate : Number(user.defaultGstRate);
   const gstAmount = Math.round((parsed.amount * gstRate) / 100 * 100) / 100;
   const total = parsed.amount + gstAmount;
   const dueDays = parsed.dueDays || user.defaultPaymentTermsDays;
@@ -249,6 +279,7 @@ async function sendConfirmationCard(
 
   const itemsList = parsed.items.map((i) => i.name).join(', ');
 
+  const gstLabel = parsed.gstRate != null ? '(custom)' : '(default)';
   const preview = [
     '📋 *Invoice Preview*',
     '',
@@ -256,11 +287,11 @@ async function sendConfirmationCard(
     `💵 Amount: ${formatCurrency(parsed.amount)}`,
     `📦 Items: ${itemsList}`,
     parsed.notes ? `📝 Note: ${parsed.notes}` : '',
-    gstRate > 0 ? `🏷️ GST (${gstRate}%): ${formatCurrency(gstAmount)}` : '',
+    `🏷️ GST (${gstRate}%) ${gstLabel}: ${gstRate > 0 ? formatCurrency(gstAmount) : 'Nil'}`,
     `💰 Total: *${formatCurrency(total)}*`,
     `📅 Due: ${formatDateShort(dueDate)}`,
     '',
-    'Look good?',
+    'Look good? _Tap Edit to change GST rate._',
   ].filter(Boolean).join('\n');
 
   await sendButtonMessage({
@@ -300,6 +331,7 @@ async function confirmAndSendInvoice(
       items: parsed.items,
       notes: parsed.notes || undefined,
       dueDays: parsed.dueDays || undefined,
+      gstRate: parsed.gstRate != null ? parsed.gstRate : undefined,
     });
 
     // Schedule payment reminders (non-fatal — don't crash invoice creation)
