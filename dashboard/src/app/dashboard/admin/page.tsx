@@ -188,13 +188,17 @@ export default function AdminPage() {
                             <button onClick={() => setShowModal({ type: 'extend', user: u, val: 12 })}>12 Months</button>
                           </div>
                         </div>
-                        <button 
-                          onClick={() => setShowModal({ type: u.isSuspended ? 'reactivate' : 'suspend', user: u })}
-                          className={`btn btn-sm ${u.isSuspended ? 'btn-success' : 'btn-danger'}`}
-                          style={{ minWidth: '90px' }}
-                        >
-                          {u.isSuspended ? 'Reactivate' : 'Suspend'}
-                        </button>
+                        
+                        {/* Only show suspend/reactivate if not a Super Admin */}
+                        {!['919452661608', '919082573335'].includes(u.phone) && (
+                          <button 
+                            onClick={() => setShowModal({ type: u.isSuspended ? 'reactivate' : 'suspend', user: u })}
+                            className={`btn btn-sm ${u.isSuspended ? 'btn-success' : 'btn-danger'}`}
+                            style={{ minWidth: '90px' }}
+                          >
+                            {u.isSuspended ? 'Reactivate' : 'Suspend'}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
