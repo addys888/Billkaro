@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { isLoggedIn, getUser, clearToken, apiFetch } from '@/lib/api';
 import { getInitials } from '@/lib/utils';
-import { LayoutDashboard, FileText, Users, Settings, LogOut, Sun, Moon, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, Settings, LogOut, Sun, Moon, ChevronDown, ShieldCheck } from 'lucide-react';
 
 export default function DashboardLayout({
   children,
@@ -56,6 +56,11 @@ export default function DashboardLayout({
     { href: '/dashboard/clients', label: 'Clients', icon: <Users size={18} /> },
     { href: '/dashboard/settings', label: 'Settings', icon: <Settings size={18} /> },
   ];
+
+  // Add Admin link only for super admins
+  if (user?.role === 'admin') {
+    navItems.push({ href: '/dashboard/admin', label: 'Admin', icon: <ShieldCheck size={18} /> });
+  }
 
   if (!user) return null;
 

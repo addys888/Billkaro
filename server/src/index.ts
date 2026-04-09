@@ -14,6 +14,7 @@ import authRoutes from './routes/auth.routes';
 import invoiceRoutes from './routes/invoice.routes';
 import clientRoutes from './routes/client.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import adminRoutes from './routes/admin.routes';
 
 const app = express();
 
@@ -62,6 +63,7 @@ app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/admin', adminRoutes);
 
 // ── Error Handling ────────────────────────────────────────
 app.use(notFoundHandler);

@@ -14,6 +14,7 @@ datasource db {
 model User {
   id                     String    @id @default(uuid())
   phone                  String    @unique
+  role                   String    @default("user")
   businessName           String    @map("business_name")
   gstin                  String?
   upiId                  String?   @map("upi_id")
