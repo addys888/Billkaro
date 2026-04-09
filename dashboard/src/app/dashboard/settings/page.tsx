@@ -1,6 +1,23 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { isLoggedIn, getUser } from '@/lib/api';
+
 export default function SettingsPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      router.push('/login');
+      return;
+    }
+    setUser(getUser());
+  }, [router]);
+
+  if (!user) return null;
+
   return (
     <div style={{ padding: '24px', color: 'var(--color-text)' }}>
       <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '24px' }}>Settings</h2>
@@ -16,7 +33,7 @@ export default function SettingsPage() {
             <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>Business Name</label>
             <input 
               type="text" 
-              defaultValue="Sharma HVAC Solutions" 
+              defaultValue={user?.businessName || ''} 
               style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none', transition: 'border-color 0.2s' }}
             />
           </div>
@@ -25,7 +42,7 @@ export default function SettingsPage() {
             <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>UPI ID (for zero-fee payments)</label>
             <input 
               type="text" 
-              defaultValue="business@upi" 
+              defaultValue={user?.upiId || ''} 
               style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none', transition: 'border-color 0.2s' }}
             />
             <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Required to receive direct Google Pay, PhonePe, or Paytm transfers.</span>
@@ -40,6 +57,7 @@ export default function SettingsPage() {
                  <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>Account Number</label>
                  <input 
                    type="text" 
+                   defaultValue={user?.bankDetails?.accountNo || ''}
                    placeholder="e.g. 50100012345678"
                    style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none' }}
                  />
@@ -48,6 +66,7 @@ export default function SettingsPage() {
                  <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>IFSC Code</label>
                  <input 
                    type="text" 
+                   defaultValue={user?.bankDetails?.ifsc || ''}
                    placeholder="e.g. HDFC0001234"
                    style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none' }}
                  />
@@ -58,6 +77,7 @@ export default function SettingsPage() {
                <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>Beneficiary Name</label>
                <input 
                  type="text" 
+                 defaultValue={user?.bankDetails?.beneficiaryName || ''}
                  placeholder="As it appears on bank statement"
                  style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none' }}
                />
@@ -68,6 +88,7 @@ export default function SettingsPage() {
             <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>Business Address</label>
             <textarea 
               rows={3}
+              defaultValue={user?.address || ''}
               placeholder="Full billing address to be embedded in invoices"
               style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none', resize: 'vertical' }}
             />
