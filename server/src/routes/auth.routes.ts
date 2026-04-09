@@ -104,4 +104,28 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ── Update Current Profile ────────────────────────────────
+router.patch('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { businessName, upiId, address, bankAccountNo, bankIfsc, bankAccountName } = req.body;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: req.userId },
+      data: {
+        businessName,
+        upiId,
+        businessAddress: address,
+        bankAccountNo,
+        bankIfsc,
+        bankAccountName,
+      }
+    });
+
+    res.json({ success: true, message: 'Profile updated' });
+  } catch (error) {
+    logger.error('Update profile error', { error });
+    res.status(500).json({ success: false, error: 'Failed to update profile' });
+  }
+});
+
 export default router;
