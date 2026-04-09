@@ -73,15 +73,64 @@ export default function InvoicesPage() {
   };
 
   const handleResend = async (inv: Invoice) => {
-    if (!inv.clientPhone) {
-      alert(`Cannot resend — ${inv.clientName} has no phone number saved.\n\nThey were created via voice invoice without a phone.`);
-      return;
+    let phone = inv.clientPhone;
+    if (!phone) {
+      const input = prompt(`Cannot resend directly.\n\n${inv.clientName} has no phone number saved (likely created via voice invoice).\n\nPlease enter a valid 10-digit WhatsApp number to resend:`);
+      if (!input || input.trim().length < 10) return;
+      phone = input.trim();
     }
+    
     try {
-      await apiFetch(`/api/invoices/${inv.id}/resend`, { method: 'POST' });
+      await apiFetch(`/api/invoices/${inv.id}/resend`, { 
+        method: 'POST',
+        body: JSON.stringify({ phone })
+      });
       alert(`✅ Invoice resent to ${inv.clientName} via WhatsApp!`);
+      if (phone !== inv.clientPhone) {
+        loadInvoices(); // Reload to show the newly saved phone number
+      }
     } catch (error: any) {
       alert(error.message || 'Failed to resend invoice');
+    }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const result = await apiFetch<InvoiceResponse>(`/api/invoices?limit=10000`);
+      if (!result.invoices || result.invoices.length === 0) {
+        alert('No invoices found to export.');
+        return;
+      }
+      
+      const headers = ['Invoice No', 'Client Name', 'Client Phone', 'Amount', 'Paid', 'Balance', 'Status', 'Date', 'Due Date'];
+      const csvData = result.invoices.map(inv => {
+        const balance = inv.totalAmount - inv.amountPaid;
+        return [
+          inv.invoiceNo,
+          `"${inv.clientName}"`,
+          inv.clientPhone || 'N/A',
+          inv.totalAmount,
+          inv.amountPaid,
+          balance,
+          inv.status,
+          formatDate(inv.createdAt),
+          formatDate(inv.dueDate)
+        ];
+      });
+      
+      const csvContent = [headers.join(','), ...csvData.map(row => row.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `BillKaro_Invoices_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to export CSV');
     }
   };
 
@@ -116,7 +165,7 @@ export default function InvoicesPage() {
       <div className="main-header">
         <h1>📋 Invoices</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-outline btn-sm" id="export-csv-btn">
+          <button onClick={handleExportCSV} className="btn btn-outline btn-sm" id="export-csv-btn">
             📥 Export CSV
           </button>
         </div>

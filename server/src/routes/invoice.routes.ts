@@ -134,7 +134,8 @@ router.patch('/:id/mark-paid', async (req: AuthRequest, res: Response) => {
 // ── Resend Invoice to Client ──────────────────────────────
 router.post('/:id/resend', async (req: AuthRequest, res: Response) => {
   try {
-    const invoice = await prisma.invoice.findFirst({
+    const { phone } = req.body;
+    let invoice = await prisma.invoice.findFirst({
       where: { id: req.params.id as string, userId: req.userId! },
       include: { client: true, user: true },
     });
@@ -142,6 +143,18 @@ router.post('/:id/resend', async (req: AuthRequest, res: Response) => {
     if (!invoice) {
       res.status(404).json({ success: false, error: 'Invoice not found' });
       return;
+    }
+
+    // If client has no phone but one was provided in the request, update the client
+    if (!invoice.client.phone && phone) {
+      await prisma.client.update({
+        where: { id: invoice.client.id },
+        data: { phone }
+      });
+      invoice = await prisma.invoice.findFirst({
+        where: { id: req.params.id as string, userId: req.userId! },
+        include: { client: true, user: true },
+      }) as NonNullable<typeof invoice>;
     }
 
     if (!invoice.client.phone) {
