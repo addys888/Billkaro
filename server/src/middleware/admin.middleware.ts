@@ -1,11 +1,16 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from './auth.middleware';
 
+const SUPER_ADMINS = ['919452661608', '919082573335'];
+
 /**
  * Middleware to restrict access to ADMIN only
  */
 export function adminMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
-  if (!req.user || req.user.role !== 'admin') {
+  const userPhone = req.user?.phone;
+  const isAdmin = req.user?.role === 'admin' || (userPhone && SUPER_ADMINS.includes(userPhone));
+
+  if (!isAdmin) {
     res.status(403).json({ success: false, error: 'Access denied. Admin privileges required.' });
     return;
   }

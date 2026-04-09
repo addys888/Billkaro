@@ -50,6 +50,8 @@ export default function DashboardLayout({
     router.push('/login');
   };
 
+  if (!user) return null;
+
   const navItems = [
     { href: '/dashboard', label: 'Overview', icon: <LayoutDashboard size={18} /> },
     { href: '/dashboard/invoices', label: 'Invoices', icon: <FileText size={18} /> },
@@ -57,12 +59,9 @@ export default function DashboardLayout({
     { href: '/dashboard/settings', label: 'Settings', icon: <Settings size={18} /> },
   ];
 
-  // Add Admin link only for super admins
   if (user?.role === 'admin') {
     navItems.push({ href: '/dashboard/admin', label: 'Admin', icon: <ShieldCheck size={18} /> });
   }
-
-  if (!user) return null;
 
   return (
     <div className="layout">

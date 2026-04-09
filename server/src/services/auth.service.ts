@@ -112,6 +112,7 @@ export async function verifyOTP(
       onboardingComplete: user.onboardingComplete,
       upiId: user.upiId,
       address: user.businessAddress,
+      role: ['919452661608', '919082573335'].includes(user.phone) ? 'admin' : user.role,
       subscription: {
         plan: user.subscriptionPlan,
         status: user.subscriptionStatus,

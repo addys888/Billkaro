@@ -105,13 +105,15 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
       daysRemaining = 14; 
     }
 
+    const SUPER_ADMINS = ['919452661608', '919082573335'];
+
     res.json({
       success: true,
       user: {
         id: user.id,
         phone: user.phone,
         businessName: user.businessName,
-        role: user.role,
+        role: SUPER_ADMINS.includes(user.phone) ? 'admin' : user.role,
         gstin: user.gstin,
         onboardingComplete: user.onboardingComplete,
         upiId: user.upiId,
