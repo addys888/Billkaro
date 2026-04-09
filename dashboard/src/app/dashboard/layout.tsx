@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { isLoggedIn, getUser, clearToken } from '@/lib/api';
+import { isLoggedIn, getUser, clearToken, apiFetch } from '@/lib/api';
 import { getInitials } from '@/lib/utils';
 import { LayoutDashboard, FileText, Users, Settings, LogOut, Sun, Moon, ChevronDown } from 'lucide-react';
 
