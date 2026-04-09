@@ -250,15 +250,17 @@ async function sendConfirmationCard(
   const itemsList = parsed.items.map((i) => i.name).join(', ');
 
   const preview = [
-    '📄 *Invoice Preview*',
-    '━━━━━━━━━━━━━━━━━━',
-    `🏢 *To:* ${parsed.clientName}`,
-    `💰 *Amount:* ${formatCurrency(parsed.amount)}`,
-    `📝 *For:* ${itemsList}`,
-    parsed.notes ? `📍 *Note:* ${parsed.notes}` : '',
-    gstRate > 0 ? `🏷️ *GST (${gstRate}%):* ${formatCurrency(gstAmount)}` : '',
-    `💵 *Total:* ${formatCurrency(total)}`,
-    `📅 *Due:* ${formatDateShort(dueDate)}`,
+    '📋 *Invoice Preview*',
+    '',
+    `👤 Client: *${parsed.clientName}*`,
+    `💵 Amount: ${formatCurrency(parsed.amount)}`,
+    `📦 Items: ${itemsList}`,
+    parsed.notes ? `📝 Note: ${parsed.notes}` : '',
+    gstRate > 0 ? `🏷️ GST (${gstRate}%): ${formatCurrency(gstAmount)}` : '',
+    `💰 Total: *${formatCurrency(total)}*`,
+    `📅 Due: ${formatDateShort(dueDate)}`,
+    '',
+    'Look good?',
   ].filter(Boolean).join('\n');
 
   await sendButtonMessage({
