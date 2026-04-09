@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
-import { ShieldCheck, Calendar, Phone, Briefcase, ChevronRight, Edit3 } from 'lucide-react';
-import { formatDate } from '@/lib/utils';
+import { ShieldCheck, Calendar, Phone, TrendingUp, Users, FileText, Activity } from 'lucide-react';
+import { formatDate, formatCurrency, formatNumber } from '@/lib/utils';
 
 export default function AdminPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -251,19 +251,6 @@ export default function AdminPage() {
         .dropdown-menu button:hover { background: rgba(37, 211, 102, 0.1); color: var(--color-primary); }
         .btn-danger { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
         .btn-danger:hover { background: #ef4444; color: white; }
-      `}</style>
-    </div>
-  );
-}
-
-      <style jsx>{`
-        .admin-container {
-          max-width: 1200px;
-          margin: 0 auto;
-        }
-        .hover-row:hover {
-          background: rgba(255, 255, 255, 0.02);
-        }
       `}</style>
     </div>
   );
