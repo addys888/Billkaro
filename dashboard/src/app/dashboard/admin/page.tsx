@@ -13,6 +13,8 @@ export default function AdminPage() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [showModal, setShowModal] = useState<{ type: string; user: any; val?: any } | null>(null);
 
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -35,6 +37,7 @@ export default function AdminPage() {
 
   const handleAction = async (userId: string, actionData: any) => {
     setUpdating(userId);
+    setOpenDropdownId(null); // Close dropdown on action
     try {
       await apiFetch(`/api/admin/users/${userId}/subscription`, {
         method: 'PATCH',
@@ -55,7 +58,7 @@ export default function AdminPage() {
   );
 
   return (
-    <div className="admin-container">
+    <div className="admin-container" onClick={() => setOpenDropdownId(null)}>
       <header style={{ marginBottom: '32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
           <div style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', padding: '8px', borderRadius: '12px' }}>
@@ -115,6 +118,7 @@ export default function AdminPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="form-input"
               style={{ paddingLeft: '40px', height: '42px', fontSize: '14px', width: '100%', background: 'rgba(255,255,255,0.03)' }}
+              onClick={(e) => e.stopPropagation()}
             />
             <div style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', opacity: 0.4 }}>
               <Search size={18} />
@@ -167,8 +171,17 @@ export default function AdminPage() {
                     <td style={{ padding: '16px 24px', textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                         <div className="action-dropdown-container">
-                          <button className="btn btn-outline btn-sm" style={{ padding: '6px 10px' }}>Extend ▾</button>
-                          <div className="dropdown-menu">
+                          <button 
+                            className="btn btn-outline btn-sm" 
+                            style={{ padding: '6px 10px' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenDropdownId(openDropdownId === u.id ? null : u.id);
+                            }}
+                          >
+                            Extend ▾
+                          </button>
+                          <div className="dropdown-menu" style={{ display: openDropdownId === u.id ? 'flex' : 'none' }}>
                             <button onClick={() => setShowModal({ type: 'extend', user: u, val: 1 })}>1 Month</button>
                             <button onClick={() => setShowModal({ type: 'extend', user: u, val: 3 })}>3 Months</button>
                             <button onClick={() => setShowModal({ type: 'extend', user: u, val: 6 })}>6 Months</button>
@@ -242,15 +255,14 @@ export default function AdminPage() {
         .dropdown-menu {
           position: absolute; right: 0; top: 100%;
           background: #121A12; border: 1px solid var(--color-border);
-          border-radius: 12px; width: 160px; display: none; flex-direction: column;
+          border-radius: 12px; width: 160px; flex-direction: column;
           z-index: 50; box-shadow: 0 20px 40px rgba(0,0,0,0.6);
           padding: 6px; margin-top: 4px; border: 1px solid rgba(37, 211, 102, 0.2);
         }
-        .action-dropdown-container:hover .dropdown-menu { display: flex; }
         .dropdown-menu button {
           padding: 10px 14px; background: none; border: none; color: #E8E8F0;
           text-align: left; font-size: 13px; cursor: pointer; transition: all 0.2s;
-          border-radius: 8px;
+          border-radius: 8px; width: 100%;
         }
         .dropdown-menu button:hover { background: rgba(37, 211, 102, 0.15); color: #25D366; }
         .btn-danger { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
