@@ -180,13 +180,21 @@ router.post('/:id/resend', async (req: AuthRequest, res: Response) => {
     });
 
     if (invoice.pdfUrl) {
-      await sendMediaMessage({
-        to: invoice.client.phone,
-        type: 'document',
-        mediaUrl: `${config.APP_URL}${invoice.pdfUrl}`,
-        caption: `Invoice #${invoice.invoiceNo}`,
-        filename: `${invoice.invoiceNo}.pdf`,
-      });
+      try {
+        const absolutePdfUrl = invoice.pdfUrl.startsWith('http') 
+          ? invoice.pdfUrl 
+          : `${config.APP_URL}${invoice.pdfUrl.startsWith('/') ? '' : '/'}${invoice.pdfUrl}`;
+          
+        await sendMediaMessage({
+          to: invoice.client.phone,
+          type: 'document',
+          mediaUrl: absolutePdfUrl,
+          caption: `Invoice #${invoice.invoiceNo}`,
+          filename: `${invoice.invoiceNo}.pdf`,
+        });
+      } catch (mediaError: any) {
+        logger.warn('Failed to attach PDF during resend', { error: mediaError?.message });
+      }
     }
 
     res.json({ success: true, message: 'Invoice resent via WhatsApp' });
