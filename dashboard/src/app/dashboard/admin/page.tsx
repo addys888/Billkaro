@@ -157,11 +157,17 @@ export default function AdminPage() {
                     </td>
                     <td style={{ padding: '16px 24px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-primary)' }}>{u.subscriptionPlan}</span>
-                        {u.isSuspended ? (
-                          <span style={{ fontSize: '10px', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px', width: 'fit-content' }}>Suspended</span>
+                        {['919452661608', '919082573335'].includes(u.phone) ? (
+                          <span style={{ fontSize: '10px', fontWeight: 800, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', padding: '4px 8px', borderRadius: '6px', width: 'fit-content', border: '1px solid rgba(245, 158, 11, 0.2)' }}>SUPER ADMIN</span>
                         ) : (
-                          <span style={{ fontSize: '10px', color: '#22c55e', background: 'rgba(34, 197, 94, 0.1)', padding: '2px 6px', borderRadius: '4px', width: 'fit-content' }}>Active</span>
+                          <>
+                            <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-primary)' }}>{u.subscriptionPlan}</span>
+                            {u.isSuspended ? (
+                              <span style={{ fontSize: '10px', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px', width: 'fit-content' }}>Suspended</span>
+                            ) : (
+                              <span style={{ fontSize: '10px', color: '#22c55e', background: 'rgba(34, 197, 94, 0.1)', padding: '2px 6px', borderRadius: '4px', width: 'fit-content' }}>Active</span>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
@@ -169,35 +175,38 @@ export default function AdminPage() {
                       <div style={{ fontSize: '13px' }}>{u.subscriptionExpiresAt ? formatDate(u.subscriptionExpiresAt) : 'N/A'}</div>
                     </td>
                     <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        <div className="action-dropdown-container">
-                          <button 
-                            className="btn btn-outline btn-sm" 
-                            style={{ padding: '6px 10px' }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenDropdownId(openDropdownId === u.id ? null : u.id);
-                            }}
-                          >
-                            Extend ▾
-                          </button>
-                          <div className="dropdown-menu" style={{ display: openDropdownId === u.id ? 'flex' : 'none' }}>
-                            <button onClick={() => setShowModal({ type: 'extend', user: u, val: 1 })}>1 Month</button>
-                            <button onClick={() => setShowModal({ type: 'extend', user: u, val: 3 })}>3 Months</button>
-                            <button onClick={() => setShowModal({ type: 'extend', user: u, val: 6 })}>6 Months</button>
-                            <button onClick={() => setShowModal({ type: 'extend', user: u, val: 12 })}>12 Months</button>
-                          </div>
-                        </div>
-                        
-                        {/* Only show suspend/reactivate if not a Super Admin */}
-                        {!['919452661608', '919082573335'].includes(u.phone) && (
-                          <button 
-                            onClick={() => setShowModal({ type: u.isSuspended ? 'reactivate' : 'suspend', user: u })}
-                            className={`btn btn-sm ${u.isSuspended ? 'btn-success' : 'btn-danger'}`}
-                            style={{ minWidth: '90px' }}
-                          >
-                            {u.isSuspended ? 'Reactivate' : 'Suspend'}
-                          </button>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', minHeight: '32px' }}>
+                        {!['919452661608', '919082573335'].includes(u.phone) ? (
+                          <>
+                            <div className="action-dropdown-container">
+                              <button 
+                                className="btn btn-outline btn-sm" 
+                                style={{ padding: '6px 10px' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenDropdownId(openDropdownId === u.id ? null : u.id);
+                                }}
+                              >
+                                Extend ▾
+                              </button>
+                              <div className="dropdown-menu" style={{ display: openDropdownId === u.id ? 'flex' : 'none' }}>
+                                <button onClick={() => setShowModal({ type: 'extend', user: u, val: 1 })}>1 Month</button>
+                                <button onClick={() => setShowModal({ type: 'extend', user: u, val: 3 })}>3 Months</button>
+                                <button onClick={() => setShowModal({ type: 'extend', user: u, val: 6 })}>6 Months</button>
+                                <button onClick={() => setShowModal({ type: 'extend', user: u, val: 12 })}>12 Months</button>
+                              </div>
+                            </div>
+                            
+                            <button 
+                              onClick={() => setShowModal({ type: u.isSuspended ? 'reactivate' : 'suspend', user: u })}
+                              className={`btn btn-sm ${u.isSuspended ? 'btn-success' : 'btn-danger'}`}
+                              style={{ minWidth: '90px' }}
+                            >
+                              {u.isSuspended ? 'Reactivate' : 'Suspend'}
+                            </button>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic', paddingRight: '8px' }}>System Account</span>
                         )}
                       </div>
                     </td>
