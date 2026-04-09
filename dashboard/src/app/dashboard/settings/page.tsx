@@ -77,9 +77,53 @@ export default function SettingsPage() {
 
   return (
     <div style={{ padding: '24px', color: 'var(--color-text)' }}>
+      <style>{`
+        @keyframes toastFade {
+          0% { opacity: 0; transform: translate(-50%, -40%) scale(0.95); }
+          10% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+          90% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+          100% { opacity: 0; transform: translate(-50%, -50%) scale(0.95); pointer-events: none; }
+        }
+      `}</style>
+
+      {/* Floating Center Toast Notification */}
+      {message && (
+        <div style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 9999,
+          background: message.includes('Failed') ? 'rgba(239, 68, 68, 0.95)' : 'rgba(16, 185, 129, 0.95)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 20px rgba(16, 185, 129, 0.3)',
+          backdropFilter: 'blur(16px)',
+          padding: '32px 48px',
+          borderRadius: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '16px',
+          color: '#ffffff',
+          animation: 'toastFade 3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+        }}>
+           <div style={{ 
+              width: '64px', height: '64px', 
+              borderRadius: '50%', 
+              background: 'rgba(255, 255, 255, 0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '32px'
+           }}>
+             {message.includes('Failed') ? '⚠️' : '✨'}
+           </div>
+           <div style={{ fontSize: '18px', fontWeight: 600, letterSpacing: '-0.01em' }}>
+             {message}
+           </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
          <h2 style={{ fontSize: '20px', fontWeight: 600 }}>Settings</h2>
-         {message && <div style={{ fontSize: '14px', color: message.includes('Failed') ? '#ef4444' : '#10b981', fontWeight: 500 }}>{message}</div>}
       </div>
       
       <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '32px', maxWidth: '600px' }}>
