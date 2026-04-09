@@ -52,4 +52,56 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
   }
 });
 
+import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
+import { prisma } from '../db/prisma';
+
+// ── Get Current Profile ───────────────────────────────────
+router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: {
+         id: true,
+         phone: true,
+         businessName: true,
+         gstin: true,
+         onboardingComplete: true,
+         upiId: true,
+         businessAddress: true,
+         bankAccountNo: true,
+         bankIfsc: true,
+         bankAccountName: true,
+         bankName: true,
+      }
+    });
+
+    if (!user) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        phone: user.phone,
+        businessName: user.businessName,
+        gstin: user.gstin,
+        onboardingComplete: user.onboardingComplete,
+        upiId: user.upiId,
+        address: user.businessAddress,
+        bankDetails: {
+          accountNo: user.bankAccountNo,
+          ifsc: user.bankIfsc,
+          beneficiaryName: user.bankAccountName,
+          bankName: user.bankName,
+        }
+      }
+    });
+  } catch (error) {
+    logger.error('Get profile error', { error });
+    res.status(500).json({ success: false, error: 'Failed to complete request' });
+  }
+});
+
 export default router;

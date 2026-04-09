@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { isLoggedIn, getUser } from '@/lib/api';
+import { isLoggedIn, apiFetch } from '@/lib/api';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -13,7 +13,15 @@ export default function SettingsPage() {
       router.push('/login');
       return;
     }
-    setUser(getUser());
+    
+    // Fetch live profile from database to ensure up-to-date address / UPI parameters
+    apiFetch<{user: any}>('/api/auth/me')
+      .then(res => {
+         setUser(res.user);
+      })
+      .catch(err => {
+         console.error('Failed to fetch latest profile:', err);
+      });
   }, [router]);
 
   if (!user) return null;
