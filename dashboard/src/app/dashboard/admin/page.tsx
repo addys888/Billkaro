@@ -7,39 +7,52 @@ import { formatDate } from '@/lib/utils';
 
 export default function AdminPage() {
   const [users, setUsers] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   const [updating, setUpdating] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState<{ type: string; user: any; val?: any } | null>(null);
 
   useEffect(() => {
-    fetchUsers();
+    fetchData();
   }, []);
 
-  const fetchUsers = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch<{ users: any[] }>('/api/admin/users');
-      setUsers(res.users);
+      const [userRes, statsRes] = await Promise.all([
+        apiFetch<{ users: any[] }>('/api/admin/users'),
+        apiFetch<{ stats: any }>('/api/admin/stats')
+      ]);
+      setUsers(userRes.users);
+      setStats(statsRes.stats);
     } catch (error) {
-      console.error('Failed to fetch users', error);
+      console.error('Failed to fetch admin data', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpdateSubscription = async (userId: string, daysToAdd: number) => {
+  const handleAction = async (userId: string, actionData: any) => {
     setUpdating(userId);
     try {
       await apiFetch(`/api/admin/users/${userId}/subscription`, {
         method: 'PATCH',
-        body: JSON.stringify({ daysToAdd }),
+        body: JSON.stringify(actionData),
       });
-      await fetchUsers();
+      await fetchData();
+      setShowModal(null);
     } catch (error) {
-      console.error('Failed to update subscription', error);
+      console.error('Action failed', error);
     } finally {
       setUpdating(null);
     }
   };
+
+  const filteredUsers = users.filter(u => 
+    u.businessName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.phone?.includes(searchTerm)
+  );
 
   return (
     <div className="admin-container">
@@ -50,90 +63,122 @@ export default function AdminPage() {
           </div>
           <div>
             <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>Super Admin Panel</h1>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', margin: 0 }}>Manage platform users and their subscription access</p>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', margin: 0 }}>Live platform stats and user management</p>
           </div>
         </div>
       </header>
 
+      {/* Stats Cards */}
+      <div className="grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
+        <div className="glass-card" style={{ padding: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', padding: '10px', borderRadius: '10px' }}><TrendingUp size={20} /></div>
+            <span style={{ fontSize: '12px', color: '#22c55e', fontWeight: 600 }}>Total Revenue</span>
+          </div>
+          <div style={{ fontSize: '24px', fontWeight: 800 }}>{stats ? formatCurrency(stats.totalRevenue) : '...'}</div>
+          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>Platform Lifecycle</div>
+        </div>
+        <div className="glass-card" style={{ padding: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: '10px', borderRadius: '10px' }}><Users size={20} /></div>
+            <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: 600 }}>Total Users</span>
+          </div>
+          <div style={{ fontSize: '24px', fontWeight: 800 }}>{stats ? formatNumber(stats.totalUsers) : '...'}</div>
+          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>{stats ? stats.activeUsers : '...'} Active Subscriptions</div>
+        </div>
+        <div className="glass-card" style={{ padding: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7', padding: '10px', borderRadius: '10px' }}><FileText size={20} /></div>
+            <span style={{ fontSize: '12px', color: '#a855f7', fontWeight: 600 }}>Total Invoices</span>
+          </div>
+          <div style={{ fontSize: '24px', fontWeight: 800 }}>{stats ? formatNumber(stats.totalInvoices) : '...'}</div>
+          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>Lifetime Generated</div>
+        </div>
+        <div className="glass-card" style={{ padding: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ background: 'rgba(249, 115, 22, 0.1)', color: '#f97316', padding: '10px', borderRadius: '10px' }}><Activity size={20} /></div>
+            <span style={{ fontSize: '12px', color: '#f97316', fontWeight: 600 }}>Today's Activity</span>
+          </div>
+          <div style={{ fontSize: '24px', fontWeight: 800 }}>{stats ? formatNumber(stats.dailyInvoices) : '...'}</div>
+          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>Invoices Created Today</div>
+        </div>
+      </div>
+
       <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0, fontSize: '16px' }}>Registered Businesses</h3>
-          <span style={{ fontSize: '12px', background: 'var(--color-primary-50)', color: 'var(--color-primary)', padding: '4px 10px', borderRadius: '12px', fontWeight: 600 }}>
-            {users.length} Total Users
-          </span>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          <h3 style={{ margin: 0, fontSize: '16px' }}>Client Management</h3>
+          <div style={{ position: 'relative', width: '300px' }}>
+            <input 
+              type="text" 
+              placeholder="Search by name or phone..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="form-input"
+              style={{ paddingLeft: '36px', height: '40px', fontSize: '13px' }}
+            />
+            <div style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}>⌕</div>
+          </div>
         </div>
 
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--color-border)' }}>
-                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>Business / Phone</th>
-                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>Subscription</th>
-                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>Expires At</th>
-                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>Actions</th>
+                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>Business</th>
+                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>Plan / Status</th>
+                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>Expiry</th>
+                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={4} style={{ padding: '48px', textAlign: 'center', color: 'var(--color-text-muted)' }}>Loading users...</td>
-                </tr>
-              ) : users.length === 0 ? (
-                <tr>
-                  <td colSpan={4} style={{ padding: '48px', textAlign: 'center', color: 'var(--color-text-muted)' }}>No users found</td>
-                </tr>
+                <tr><td colSpan={4} style={{ padding: '48px', textAlign: 'center' }}>Loading platform data...</td></tr>
+              ) : filteredUsers.length === 0 ? (
+                <tr><td colSpan={4} style={{ padding: '48px', textAlign: 'center' }}>No matching businesses found</td></tr>
               ) : (
-                users.map((u) => (
-                  <tr key={u.id} style={{ borderBottom: '1px solid var(--color-border)', transition: 'background 0.2s' }} className="hover-row">
+                filteredUsers.map((u) => (
+                  <tr key={u.id} className="hover-row" style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <td style={{ padding: '16px 24px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '36px', height: '36px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-primary)' }}>
-                          <Briefcase size={18} />
+                        <div style={{ width: '36px', height: '36px', background: 'var(--color-surface)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'var(--color-primary)', border: '1px solid var(--color-border)' }}>
+                          {u.businessName?.[0] || 'B'}
                         </div>
                         <div>
                           <div style={{ fontSize: '14px', fontWeight: 600 }}>{u.businessName}</div>
-                          <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Phone size={10} /> +{u.phone}
-                          </div>
+                          <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>+{u.phone}</div>
                         </div>
                       </div>
                     </td>
                     <td style={{ padding: '16px 24px' }}>
-                      <span style={{ 
-                        fontSize: '11px', 
-                        padding: '3px 8px', 
-                        borderRadius: '6px', 
-                        background: u.subscriptionStatus === 'active' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                        color: u.subscriptionStatus === 'active' ? '#22c55e' : '#ef4444',
-                        fontWeight: 600,
-                        textTransform: 'uppercase'
-                      }}>
-                        {u.subscriptionPlan}
-                      </span>
-                    </td>
-                    <td style={{ padding: '16px 24px' }}>
-                      <div style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Calendar size={14} style={{ opacity: 0.5 }} />
-                        {u.subscriptionExpiresAt ? formatDate(u.subscriptionExpiresAt) : 'Never'}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-primary)' }}>{u.subscriptionPlan}</span>
+                        {u.isSuspended ? (
+                          <span style={{ fontSize: '10px', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 6px', borderRadius: '4px', width: 'fit-content' }}>Suspended</span>
+                        ) : (
+                          <span style={{ fontSize: '10px', color: '#22c55e', background: 'rgba(34, 197, 94, 0.1)', padding: '2px 6px', borderRadius: '4px', width: 'fit-content' }}>Active</span>
+                        )}
                       </div>
                     </td>
                     <td style={{ padding: '16px 24px' }}>
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ fontSize: '13px' }}>{u.subscriptionExpiresAt ? formatDate(u.subscriptionExpiresAt) : 'N/A'}</div>
+                    </td>
+                    <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <div className="action-dropdown-container">
+                          <button className="btn btn-outline btn-sm" style={{ padding: '6px 10px' }}>Extend ▾</button>
+                          <div className="dropdown-menu">
+                            <button onClick={() => setShowModal({ type: 'extend', user: u, val: 1 })}>1 Month</button>
+                            <button onClick={() => setShowModal({ type: 'extend', user: u, val: 3 })}>3 Months</button>
+                            <button onClick={() => setShowModal({ type: 'extend', user: u, val: 6 })}>6 Months</button>
+                            <button onClick={() => setShowModal({ type: 'extend', user: u, val: 12 })}>12 Months</button>
+                          </div>
+                        </div>
                         <button 
-                          className="btn btn-primary btn-sm"
-                          disabled={updating === u.id}
-                          onClick={() => handleUpdateSubscription(u.id, 365)}
-                          style={{ padding: '4px 12px', fontSize: '12px' }}
+                          onClick={() => setShowModal({ type: u.isSuspended ? 'reactivate' : 'suspend', user: u })}
+                          className={`btn btn-sm ${u.isSuspended ? 'btn-success' : 'btn-danger'}`}
+                          style={{ minWidth: '90px' }}
                         >
-                          {updating === u.id ? '...' : '+1 Year'}
-                        </button>
-                        <button 
-                          className="btn btn-outline btn-sm"
-                          disabled={updating === u.id}
-                          onClick={() => handleUpdateSubscription(u.id, 14)}
-                          style={{ padding: '4px 12px', fontSize: '12px' }}
-                        >
-                          +14 Days
+                          {u.isSuspended ? 'Reactivate' : 'Suspend'}
                         </button>
                       </div>
                     </td>
@@ -144,6 +189,72 @@ export default function AdminPage() {
           </table>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {showModal && (
+        <div className="modal-overlay">
+          <div className="glass-card modal-content" style={{ maxWidth: '400px', width: '90%', textAlign: 'center', padding: '32px' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>
+              {showModal.type === 'extend' ? '📅' : showModal.type === 'suspend' ? '⚠️' : '✅'}
+            </div>
+            <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '12px' }}>
+              {showModal.type === 'extend' ? `Extend Subscription` : showModal.type === 'suspend' ? 'Suspend Account' : 'Reactivate Account'}
+            </h2>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginBottom: '24px' }}>
+              {showModal.type === 'extend' 
+                ? `You are extending ${showModal.user.businessName}'s plan by ${showModal.val} months.`
+                : showModal.type === 'suspend'
+                  ? `This will immediately block ${showModal.user.businessName} from accessing the platform.`
+                  : `This will restore access for ${showModal.user.businessName}.`
+              }
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button className="btn btn-outline" onClick={() => setShowModal(null)}>Cancel</button>
+              <button 
+                className={`btn ${showModal.type === 'suspend' ? 'btn-danger' : 'btn-primary'}`}
+                disabled={!!updating}
+                onClick={() => {
+                  if (showModal.type === 'extend') {
+                    handleAction(showModal.user.id, { monthsToAdd: showModal.val });
+                  } else {
+                    handleAction(showModal.user.id, { isSuspended: showModal.type === 'suspend' });
+                  }
+                }}
+              >
+                {updating ? 'Processing...' : 'Confirm Action'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        .admin-container { max-width: 1200px; margin: 0 auto; }
+        .hover-row:hover { background: rgba(255, 255, 255, 0.02); }
+        .modal-overlay {
+          position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(0,0,0,0.8); backdrop-filter: blur(4px);
+          display: flex; align-items: center; justify-content: center; z-index: 1000;
+        }
+        .action-dropdown-container { position: relative; }
+        .dropdown-menu {
+          position: absolute; right: 0; top: calc(100% + 5px);
+          background: #0D150D; border: 1px solid var(--color-border);
+          border-radius: 8px; width: 140px; display: none; flex-direction: column;
+          z-index: 10; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .action-dropdown-container:hover .dropdown-menu { display: flex; }
+        .dropdown-menu button {
+          padding: 10px 14px; background: none; border: none; color: #E8E8F0;
+          text-align: left; font-size: 13px; cursor: pointer; transition: background 0.2s;
+        }
+        .dropdown-menu button:hover { background: rgba(37, 211, 102, 0.1); color: var(--color-primary); }
+        .btn-danger { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
+        .btn-danger:hover { background: #ef4444; color: white; }
+      `}</style>
+    </div>
+  );
+}
 
       <style jsx>{`
         .admin-container {

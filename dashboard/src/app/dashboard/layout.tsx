@@ -118,22 +118,37 @@ export default function DashboardLayout({
           `}</style>
 
           {user?.subscription && (
-            <div 
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px', 
-                padding: '6px 14px', 
-                borderRadius: '8px',
-                background: user.subscription.daysRemaining <= 7 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-                border: user.subscription.daysRemaining <= 7 ? '1px solid #ef4444' : '1px solid #22c55e',
-                color: user.subscription.daysRemaining <= 7 ? '#ef4444' : '#22c55e',
-                fontSize: '12px',
-                fontWeight: 600,
-                animation: user.subscription.daysRemaining <= 7 ? 'pulse-red 2s infinite' : 'none'
-              }}
-            >
-              {user.subscription.daysRemaining <= 7 ? '⚠️ Expiring Soon:' : '💎 Active Plan:'} {user.subscription.daysRemaining} Days Left
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  padding: '6px 14px', 
+                  borderRadius: '8px',
+                  background: user.subscription.daysRemaining <= 7 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                  border: user.subscription.daysRemaining <= 7 ? '1px solid #ef4444' : '1px solid #22c55e',
+                  color: user.subscription.daysRemaining <= 7 ? '#ef4444' : '#22c55e',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  animation: user.subscription.daysRemaining <= 7 ? 'pulse-red 2s infinite' : 'none'
+                }}
+              >
+                {user.subscription.daysRemaining <= 7 ? '⚠️ Expiring Soon:' : '💎 Active Plan:'} {user.subscription.daysRemaining} Days Left
+              </div>
+
+              {user.subscription.daysRemaining <= 3 && (
+                <button 
+                  className="btn btn-primary btn-sm"
+                  style={{ height: '32px', fontSize: '11px', padding: '0 12px' }}
+                  onClick={() => {
+                    const msg = `Hi, my BillKaro subscription is expiring in ${user.subscription.daysRemaining} days. I want to renew! (ID: ${user.id})`;
+                    window.open(`https://wa.me/919452661608?text=${encodeURIComponent(msg)}`, '_blank');
+                  }}
+                >
+                  Renew Now
+                </button>
+              )}
             </div>
           )}
 

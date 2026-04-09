@@ -15,6 +15,7 @@ model User {
   id                     String    @id @default(uuid())
   phone                  String    @unique
   role                   String    @default("user")
+  isSuspended            Boolean   @default(false) @map("is_suspended")
   businessName           String    @map("business_name")
   gstin                  String?
   upiId                  String?   @map("upi_id")

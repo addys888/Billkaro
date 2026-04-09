@@ -34,6 +34,13 @@ export async function authMiddleware(
 
     req.userId = user.id;
     req.user = user;
+
+    // Block suspended users
+    if (user.isSuspended) {
+      res.status(403).json({ success: false, error: 'Your account has been suspended. Please contact support.' });
+      return;
+    }
+
     next();
   } catch (error) {
     logger.error('Auth middleware error', { error });
