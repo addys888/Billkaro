@@ -86,15 +86,25 @@ router.patch('/users/:id/subscription', async (req: AuthRequest, res: Response) 
       updateData.isSuspended = isSuspended;
     }
 
+    const user = await prisma.user.findUnique({ where: { id }, select: { subscriptionExpiresAt: true } });
+    if (!user) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    const currentExpiry = user.subscriptionExpiresAt && new Date(user.subscriptionExpiresAt) > new Date()
+      ? new Date(user.subscriptionExpiresAt)
+      : new Date();
+
     if (expiresAt) {
       updateData.subscriptionExpiresAt = new Date(expiresAt);
     } else if (monthsToAdd != null) {
-      const now = new Date();
-      now.setMonth(now.getMonth() + monthsToAdd);
-      updateData.subscriptionExpiresAt = now;
-      updateData.subscriptionStatus = 'active'; // Reactivate if extending
+      const newExpiry = new Date(currentExpiry);
+      newExpiry.setMonth(newExpiry.getMonth() + monthsToAdd);
+      updateData.subscriptionExpiresAt = newExpiry;
+      updateData.subscriptionStatus = 'active';
     } else if (daysToAdd != null) {
-      const newExpiry = new Date();
+      const newExpiry = new Date(currentExpiry);
       newExpiry.setDate(newExpiry.getDate() + daysToAdd);
       updateData.subscriptionExpiresAt = newExpiry;
       updateData.subscriptionStatus = 'active';
