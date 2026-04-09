@@ -17,8 +17,7 @@ export default function SettingsPage() {
             <input 
               type="text" 
               defaultValue="Sharma HVAC Solutions" 
-              style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none' }}
-              disabled
+              style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none', transition: 'border-color 0.2s' }}
             />
           </div>
 
@@ -27,14 +26,59 @@ export default function SettingsPage() {
             <input 
               type="text" 
               defaultValue="business@upi" 
-              style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none' }}
-              disabled
+              style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none', transition: 'border-color 0.2s' }}
+            />
+            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Required to receive direct Google Pay, PhonePe, or Paytm transfers.</span>
+          </div>
+
+          {/* Bank Details section */}
+          <div style={{ padding: '20px', border: '1px dashed var(--color-border)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--color-bg)' }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text)' }}>Bank Details</div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                 <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>Account Number</label>
+                 <input 
+                   type="text" 
+                   placeholder="e.g. 50100012345678"
+                   style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none' }}
+                 />
+               </div>
+               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                 <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>IFSC Code</label>
+                 <input 
+                   type="text" 
+                   placeholder="e.g. HDFC0001234"
+                   style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none' }}
+                 />
+               </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+               <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>Beneficiary Name</label>
+               <input 
+                 type="text" 
+                 placeholder="As it appears on bank statement"
+                 style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none' }}
+               />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>Business Address</label>
+            <textarea 
+              rows={3}
+              placeholder="Full billing address to be embedded in invoices"
+              style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none', resize: 'vertical' }}
             />
           </div>
         </div>
 
-        <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'flex-end' }}>
-          <button style={{ background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '6px', padding: '10px 24px', fontWeight: 600, cursor: 'not-allowed', opacity: 0.7 }}>
+        <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+          <button style={{ background: 'transparent', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 24px', fontWeight: 600, cursor: 'pointer' }}>
+            Cancel
+          </button>
+          <button style={{ background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: '6px', padding: '10px 24px', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s' }}>
             Save Changes
           </button>
         </div>
