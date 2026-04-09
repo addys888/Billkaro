@@ -17,6 +17,16 @@ router.post('/send-otp', async (req: Request, res: Response) => {
     // Normalize phone (ensure starts with 91)
     const normalizedPhone = phone.startsWith('91') ? phone : `91${phone}`;
 
+    // Check if user exists
+    const user = await prisma.user.findUnique({ where: { phone: normalizedPhone } });
+    if (!user) {
+      res.status(404).json({ 
+        success: false, 
+        error: 'Mobile number not registered. Please contact support to get started with BillKaro.' 
+      });
+      return;
+    }
+
     await sendOTP(normalizedPhone);
 
     res.json({ success: true, message: 'OTP sent via WhatsApp' });
