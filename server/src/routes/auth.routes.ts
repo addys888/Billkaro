@@ -100,8 +100,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
       const diffTime = expires.getTime() - now.getTime();
       daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
     } else {
-      // If no expiry is set, default to 14 days from registration (trial) for demo purposes
-      const trialEnd = new Date(user.id.startsWith('test') ? Date.now() + 14 * 86400000 : user.id.length); // fallback logic
+      // If no expiry is set, default to 14 days (trial)
       daysRemaining = 14; 
     }
 
