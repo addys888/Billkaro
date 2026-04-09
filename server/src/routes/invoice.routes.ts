@@ -134,7 +134,7 @@ router.patch('/:id/mark-paid', async (req: AuthRequest, res: Response) => {
 // ── Resend Invoice to Client ──────────────────────────────
 router.post('/:id/resend', async (req: AuthRequest, res: Response) => {
   try {
-    const { phone } = req.body;
+    let { phone } = req.body;
     let invoice = await prisma.invoice.findFirst({
       where: { id: req.params.id as string, userId: req.userId! },
       include: { client: true, user: true },
@@ -147,10 +147,21 @@ router.post('/:id/resend', async (req: AuthRequest, res: Response) => {
 
     // If client has no phone but one was provided in the request, update the client
     if (!invoice.client.phone && phone) {
-      await prisma.client.update({
-        where: { id: invoice.client.id },
-        data: { phone }
-      });
+      const normalizedPhone = phone.startsWith('91') ? phone : `91${phone}`;
+      
+      try {
+        await prisma.client.update({
+          where: { id: invoice.client.id },
+          data: { phone: normalizedPhone }
+        });
+      } catch (e: any) {
+         if (e.code === 'P2002') {
+            res.status(400).json({ success: false, error: 'This phone number is already registered to another client.' });
+            return;
+         }
+         throw e;
+      }
+      
       invoice = await prisma.invoice.findFirst({
         where: { id: req.params.id as string, userId: req.userId! },
         include: { client: true, user: true },
