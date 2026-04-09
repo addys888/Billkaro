@@ -23,7 +23,15 @@ export default function DashboardLayout({
       router.push('/login');
       return;
     }
-    setUser(getUser());
+    
+    // Fetch fresh profile with subscription details
+    apiFetch<{user: any}>('/api/auth/me')
+      .then(res => {
+        setUser(res.user);
+      })
+      .catch(() => {
+        setUser(getUser()); // Fallback to cache if API fails
+      });
 
     // Apply dark mode class on mount (default to true)
     document.documentElement.classList.add('dark');
@@ -97,6 +105,33 @@ export default function DashboardLayout({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: '6px 12px', borderRadius: 'var(--radius-full)', fontSize: '14px', cursor: 'pointer', color: 'var(--color-text-secondary)' }}>
             This Month <ChevronDown size={14} />
           </div>
+          <style>{`
+            @keyframes pulse-red {
+              0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+              70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+              100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+            }
+          `}</style>
+
+          {user?.subscription && (
+            <div 
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                padding: '6px 14px', 
+                borderRadius: '8px',
+                background: user.subscription.daysRemaining <= 7 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                border: user.subscription.daysRemaining <= 7 ? '1px solid #ef4444' : '1px solid #22c55e',
+                color: user.subscription.daysRemaining <= 7 ? '#ef4444' : '#22c55e',
+                fontSize: '12px',
+                fontWeight: 600,
+                animation: user.subscription.daysRemaining <= 7 ? 'pulse-red 2s infinite' : 'none'
+              }}
+            >
+              {user.subscription.daysRemaining <= 7 ? '⚠️ Expiring Soon:' : '💎 Active Plan:'} {user.subscription.daysRemaining} Days Left
+            </div>
+          )}
 
           {/* Theme Toggle */}
           <button

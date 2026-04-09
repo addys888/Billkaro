@@ -26,6 +26,12 @@ model User {
   defaultGstRate         Decimal   @default(18) @map("default_gst_rate") @db.Decimal(4, 2)
   enableAdvancePayment   Boolean   @default(false) @map("enable_advance_payment")
   onboardingComplete     Boolean   @default(false) @map("onboarding_complete")
+  
+  // ── Subscription Details ────────────────────────────────
+  subscriptionPlan       String    @default("Trial") @map("subscription_plan")
+  subscriptionStatus     String    @default("active") @map("subscription_status")
+  subscriptionExpiresAt  DateTime? @map("subscription_expires_at")
+  
   createdAt              DateTime  @default(now()) @map("created_at")
   updatedAt              DateTime  @updatedAt @map("updated_at")
 

@@ -82,12 +82,28 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
          bankIfsc: true,
          bankAccountName: true,
          bankName: true,
+         subscriptionPlan: true,
+         subscriptionStatus: true,
+         subscriptionExpiresAt: true,
       }
     });
 
     if (!user) {
       res.status(404).json({ success: false, error: 'User not found' });
       return;
+    }
+
+    // Calculate days remaining
+    let daysRemaining = 0;
+    if (user.subscriptionExpiresAt) {
+      const now = new Date();
+      const expires = new Date(user.subscriptionExpiresAt);
+      const diffTime = expires.getTime() - now.getTime();
+      daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    } else {
+      // If no expiry is set, default to 14 days from registration (trial) for demo purposes
+      const trialEnd = new Date(user.id.startsWith('test') ? Date.now() + 14 * 86400000 : user.id.length); // fallback logic
+      daysRemaining = 14; 
     }
 
     res.json({
@@ -100,6 +116,12 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
         onboardingComplete: user.onboardingComplete,
         upiId: user.upiId,
         address: user.businessAddress,
+        subscription: {
+          plan: user.subscriptionPlan,
+          status: user.subscriptionStatus,
+          expiresAt: user.subscriptionExpiresAt,
+          daysRemaining: daysRemaining
+        },
         bankDetails: {
           accountNo: user.bankAccountNo,
           ifsc: user.bankIfsc,

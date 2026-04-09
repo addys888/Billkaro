@@ -80,11 +80,17 @@ export async function verifyOTP(
   let user = await prisma.user.findUnique({ where: { phone } });
 
   if (!user) {
-    // Create new user (they'll complete onboarding via WhatsApp)
+    // Create new user with 14-day trial
+    const trialExpiry = new Date();
+    trialExpiry.setDate(trialExpiry.getDate() + 14);
+
     user = await prisma.user.create({
       data: {
         phone,
-        businessName: 'My Business', // Placeholder, updated during onboarding
+        businessName: 'My Business',
+        subscriptionPlan: "Trial",
+        subscriptionStatus: "active",
+        subscriptionExpiresAt: trialExpiry,
       },
     });
   }
@@ -104,6 +110,22 @@ export async function verifyOTP(
       businessName: user.businessName,
       gstin: user.gstin,
       onboardingComplete: user.onboardingComplete,
+      upiId: user.upiId,
+      address: user.businessAddress,
+      subscription: {
+        plan: user.subscriptionPlan,
+        status: user.subscriptionStatus,
+        expiresAt: user.subscriptionExpiresAt,
+        daysRemaining: user.subscriptionExpiresAt 
+          ? Math.max(0, Math.ceil((new Date(user.subscriptionExpiresAt).getTime() - Date.now()) / 86400000))
+          : 0
+      },
+      bankDetails: {
+        accountNo: user.bankAccountNo,
+        ifsc: user.bankIfsc,
+        beneficiaryName: user.bankAccountName,
+        bankName: user.bankName,
+      }
     },
   };
 }
