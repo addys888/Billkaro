@@ -154,17 +154,19 @@ export default function LoginPage() {
                 ))}
               </div>
             </div>
-            <button className="btn btn-primary" type="submit" disabled={loading} id="verify-otp-btn">
-              {loading ? '⏳ Verifying...' : '✅ Verify & Login'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              style={{ width: '100%', marginTop: '8px' }}
-              onClick={() => { setStep('phone'); setOtp(['', '', '', '', '', '']); setError(''); }}
-            >
-              ← Change Number
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
+              <button className="btn btn-primary" type="submit" disabled={loading} id="verify-otp-btn" style={{ width: '100%' }}>
+                {loading ? '⏳ Verifying...' : '✅ Verify & Login'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ width: '100%', border: 'none', background: 'transparent', color: 'var(--color-text-muted)', fontSize: '13px' }}
+                onClick={() => { setStep('phone'); setOtp(['', '', '', '', '', '']); setError(''); }}
+              >
+                ← Change Number
+              </button>
+            </div>
           </form>
         )}
       </div>
