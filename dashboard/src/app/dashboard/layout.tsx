@@ -103,12 +103,7 @@ export default function DashboardLayout({
       </aside>
 
       <main className="main-content" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-        {/* Top Header */}
         <header style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '16px 32px', gap: '20px', zIndex: 10 }}>
-          {/* Period Dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: '6px 12px', borderRadius: 'var(--radius-full)', fontSize: '14px', cursor: 'pointer', color: 'var(--color-text-secondary)' }}>
-            This Month <ChevronDown size={14} />
-          </div>
           <style>{`
             @keyframes pulse-red {
               0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
