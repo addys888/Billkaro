@@ -206,6 +206,6 @@ async function handleInteractiveReply(phone: string, buttonId: string): Promise<
 async function sendHelpMessage(phone: string): Promise<void> {
   await sendTextMessage({
     to: phone,
-    text: `👋 *Welcome to BillKaro!*\n\nHere's what I can do:\n\n📄 *Create Invoice:*\n"Bill 5000 to Rahul for AC repair"\n\n💰 *Check Pending:*\n"Kitna baaki hai" or "pending"\n\n✅ *Mark Paid:*\n"Rahul ne pay kar diya"\n\n⏸️ *Pause Reminders:*\n"Priya ke reminders band karo"\n\n📊 *Dashboard:*\nVisit app.billkaro.in\n\nJust type or send a voice note! 🎤`,
+    text: `👋 *Welcome to BillKaro!*\n\nHere's what I can do:\n\n📄 *Create Invoice:*\n"Bill 5000 to Rahul for AC repair"\n\n💰 *Check Pending:*\n"pending" or "kitna baaki hai"\n\n✅ *Record Payment:*\n"Paid #0004" or "Paid BK-MP-2604-0004"\n\n⏸️ *Pause Reminders:*\n"Pause #0004"\n\n📊 *Dashboard:*\napp.billkaro.in\n\nJust type or send a voice note! 🎤`,
   });
 }

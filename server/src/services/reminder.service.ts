@@ -229,18 +229,22 @@ async function sendReminderMessage(
   const ownerPhone = invoice.user.phone;
   const clientName = invoice.client.name;
   const invoiceNo = invoice.invoiceNo;
-  const amount = formatCurrency(Number(invoice.totalAmount));
+  const totalAmount = Number(invoice.totalAmount);
+  const amountPaid = Number(invoice.amountPaid || 0);
+  const balanceDue = totalAmount - amountPaid;
+  const amount = formatCurrency(balanceDue); // Show BALANCE DUE, not total
   const dueDate = formatDateShort(new Date(invoice.dueDate));
   const paymentLink = invoice.paymentLink || '';
   const businessName = invoice.user.businessName;
   const description = invoice.description || 'Services';
+  const partialNote = amountPaid > 0 ? `\n(${formatCurrency(amountPaid)} already received — thank you!)` : '';
 
   switch (reminderType) {
     case ReminderType.DUE_DATE:
       if (clientPhone) {
         await sendTextMessage({
           to: clientPhone,
-          text: `Hi ${clientName} 🙏,\n\nA friendly reminder that invoice #${invoiceNo} for ${amount} (${description}) is due today.\n\n💳 Quick Pay: ${paymentLink}\n\nThank you!\n— ${businessName}`,
+          text: `Hi ${clientName} 🙏,\n\nA friendly reminder that invoice #${invoiceNo} for ${amount} (${description}) is due today.${partialNote}\n\n💳 Quick Pay: ${paymentLink}\n\nThank you!\n— ${businessName}`,
         });
       }
       break;
@@ -249,7 +253,7 @@ async function sendReminderMessage(
       if (clientPhone) {
         await sendTextMessage({
           to: clientPhone,
-          text: `Hi ${clientName},\n\nHope you're doing well! Just following up on invoice #${invoiceNo} for ${amount}, which was due on ${dueDate}.\n\nIf already paid, please ignore this message 🙏\n💳 Pay now: ${paymentLink}\n\n— ${businessName}`,
+          text: `Hi ${clientName},\n\nHope you're doing well! Just following up on invoice #${invoiceNo} — ${amount} is pending.${partialNote}\n\nDue date was: ${dueDate}\n\nIf already paid, please ignore this message 🙏\n💳 Pay now: ${paymentLink}\n\n— ${businessName}`,
         });
       }
       break;
@@ -258,13 +262,13 @@ async function sendReminderMessage(
       if (clientPhone) {
         await sendTextMessage({
           to: clientPhone,
-          text: `Hi ${clientName},\n\nThis is a reminder that invoice #${invoiceNo} for ${amount} is now 7 days overdue (due: ${dueDate}).\n\nTo avoid any inconvenience, kindly clear the payment at your earliest convenience.\n\n💳 Pay now: ${paymentLink}\n📞 Questions? Call ${ownerPhone}\n\n— ${businessName}`,
+          text: `Hi ${clientName},\n\nThis is a reminder that invoice #${invoiceNo} — ${amount} is now 7 days overdue (due: ${dueDate}).${partialNote}\n\nTo avoid any inconvenience, kindly clear the payment at your earliest convenience.\n\n💳 Pay now: ${paymentLink}\n📞 Questions? Call ${ownerPhone}\n\n— ${businessName}`,
         });
       }
       // Also notify owner
       await sendTextMessage({
         to: ownerPhone,
-        text: `⚠️ Invoice #${invoiceNo} for ${amount} to ${clientName} is now 7 days overdue. Client has been sent a follow-up reminder.`,
+        text: `⚠️ Invoice *#${invoiceNo}* — ${amount} pending from ${clientName} is now 7 days overdue. Client has been sent a follow-up.`,
       });
       break;
 
@@ -272,7 +276,7 @@ async function sendReminderMessage(
       // Only notify the owner — do NOT bother the client further
       await sendButtonMessage({
         to: ownerPhone,
-        bodyText: `⚠️ *Overdue Alert*\n\n${clientName} has NOT paid invoice #${invoiceNo} for ${amount}. It's now 15 days overdue.\n\nWhat would you like to do?`,
+        bodyText: `⚠️ *Overdue Alert*\n\n${clientName} has NOT paid invoice *#${invoiceNo}* — ${amount} pending. It's now 15 days overdue.\n\nWhat would you like to do?`,
         buttons: [
           { id: 'call_client', title: '📞 Call Client' },
           { id: 'send_final_reminder', title: '📤 Final Reminder' },

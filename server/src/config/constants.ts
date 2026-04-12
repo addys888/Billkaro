@@ -65,9 +65,9 @@ export const ONBOARDING_STEPS = [
 // ── Bot Commands ───────────────────────────────────────────
 export const BOT_COMMANDS = {
   HELP: ['help', 'madad', 'sahayata'],
-  MARK_PAID: ['mark paid', 'paid', 'pay kar diya', 'payment ho gaya', 'paisa aa gaya'],
-  PAUSE_REMINDERS: ['pause', 'band karo', 'reminders band', 'stop reminders'],
-  RESUME_REMINDERS: ['resume', 'chalu karo', 'reminders chalu', 'start reminders'],
+  MARK_PAID: ['mark paid', 'paid', 'pay kar diya', 'payment ho gaya', 'paisa aa gaya', 'paid #', 'paid bk-'],
+  PAUSE_REMINDERS: ['pause', 'band karo', 'reminders band', 'stop reminders', 'pause #', 'pause bk-'],
+  RESUME_REMINDERS: ['resume', 'chalu karo', 'reminders chalu', 'start reminders', 'resume #', 'resume bk-'],
   LIST_PENDING: ['pending', 'due', 'baaki', 'kitna baaki'],
   CANCEL: ['cancel', 'nahi', 'no'],
 } as const;

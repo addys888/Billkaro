@@ -8,7 +8,70 @@ import { BOT_COMMANDS } from '../../config/constants';
 import { updateSession, clearSession, getSession } from '../session-manager';
 import { logger } from '../../utils/logger';
 
+// ── Invoice number pattern ────────────────────────────────
+// Matches: BK-MP-2604-0004, BK-2604-0004, etc.
+const INVOICE_NO_REGEX = /BK-(?:[A-Z]{2}-)?(\d{4})-(\d{4})/i;
 
+/**
+ * Extract invoice number from text — tries exact match first, then short code (last 4 digits)
+ */
+function extractInvoiceRef(text: string): { invoiceNo: string | null; shortCode: string | null } {
+  const fullMatch = text.match(INVOICE_NO_REGEX);
+  if (fullMatch) {
+    return { invoiceNo: fullMatch[0].toUpperCase(), shortCode: null };
+  }
+  // Short code: just 4 digits like "0004" or "#0004" or "4"
+  const shortMatch = text.match(/(?:#|no\.?\s*)?(\d{1,4})\b/i);
+  if (shortMatch) {
+    return { invoiceNo: null, shortCode: shortMatch[1].padStart(4, '0') };
+  }
+  return { invoiceNo: null, shortCode: null };
+}
+
+/**
+ * Find invoice by full number or short code (last 4 digits)
+ */
+async function findInvoice(userId: string, text: string): Promise<any> {
+  const { invoiceNo, shortCode } = extractInvoiceRef(text);
+
+  // 1. Try exact match
+  if (invoiceNo) {
+    const invoice = await getInvoiceByNumber(invoiceNo, userId);
+    if (invoice) return invoice;
+  }
+
+  // 2. Try short code (last 4 digits) — search recent invoices
+  if (shortCode) {
+    const invoice = await prisma.invoice.findFirst({
+      where: {
+        userId,
+        invoiceNo: { endsWith: shortCode },
+      },
+      include: { client: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (invoice) return invoice;
+  }
+
+  // 3. Try client name match as fallback
+  const pendingInvoices = await prisma.invoice.findMany({
+    where: {
+      userId,
+      status: { in: [InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE] },
+    },
+    include: { client: true },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+
+  for (const inv of pendingInvoices) {
+    if (text.toLowerCase().includes(inv.client.name.toLowerCase())) {
+      return inv;
+    }
+  }
+
+  return null;
+}
 
 /**
  * Handle bot commands (non-invoice messages)
@@ -58,20 +121,13 @@ export async function handleCommand(phone: string, input: string, user: User): P
 }
 
 /**
- * Handle "mark paid" command - shows interactive Full/Partial buttons
+ * Handle "mark paid" command — invoice-number-first approach
  */
 async function handleMarkPaid(phone: string, input: string, user: User): Promise<void> {
-  // Try to extract invoice number
-  const invoiceNoMatch = input.match(/BK-[A-Z]{2}-\d{4}-\d{4}|BK-\d{4}-\d{4}/i);
+  const invoice = await findInvoice(user.id, input);
 
-  let invoice: any = null;
-
-  if (invoiceNoMatch) {
-    invoice = await getInvoiceByNumber(invoiceNoMatch[0].toUpperCase(), user.id);
-  }
-
-  // Try to find by client name if no invoice number found
   if (!invoice) {
+    // No match — show pending list with invoice numbers
     const pendingInvoices = await prisma.invoice.findMany({
       where: {
         userId: user.id,
@@ -79,43 +135,38 @@ async function handleMarkPaid(phone: string, input: string, user: User): Promise
       },
       include: { client: true },
       orderBy: { createdAt: 'desc' },
-      take: 10,
+      take: 8,
     });
 
-    for (const inv of pendingInvoices) {
-      if (input.toLowerCase().includes(inv.client.name.toLowerCase())) {
-        invoice = inv;
-        break;
-      }
-    }
-
-    // If still not found, show pending list
-    if (!invoice) {
-      if (pendingInvoices.length === 0) {
-        await sendTextMessage({ to: phone, text: '✅ No pending invoices found!' });
-      } else {
-        let list = '📋 *Pending Invoices:*\n\n';
-        for (const inv of pendingInvoices.slice(0, 5)) {
-          const paid = Number(inv.amountPaid || 0);
-          const total = Number(inv.totalAmount);
-          const balance = total - paid;
-          const partialTag = paid > 0 ? ` (₹${paid} paid, ₹${balance} due)` : '';
-          list += `• #${inv.invoiceNo} — ${inv.client.name} — ${formatCurrency(total)}${partialTag}\n`;
-        }
-        list += '\nTo record payment, say:\n"Rahul ne pay kar diya"';
-        await sendTextMessage({ to: phone, text: list });
-      }
+    if (pendingInvoices.length === 0) {
+      await sendTextMessage({ to: phone, text: '✅ No pending invoices found!' });
       return;
     }
+
+    let list = '📋 *Pending Invoices:*\n\n';
+    for (const inv of pendingInvoices) {
+      const paid = Number(inv.amountPaid || 0);
+      const total = Number(inv.totalAmount);
+      const balance = total - paid;
+      const status = inv.status === InvoiceStatus.OVERDUE ? '🔴' :
+                     inv.status === InvoiceStatus.PARTIALLY_PAID ? '🟡' : '⚪';
+      const partialTag = paid > 0 ? ` (₹${paid} paid)` : '';
+      list += `${status} *#${inv.invoiceNo}*\n   ${inv.client.name} — ${formatCurrency(balance)} due${partialTag}\n\n`;
+    }
+    list += '━━━━━━━━━━━━━━━━━━\n';
+    list += '💡 To mark paid, send:\n';
+    list += '_\"Paid #0004\"_ or _\"Paid BK-MP-2604-0004\"_';
+    await sendTextMessage({ to: phone, text: list });
+    return;
   }
 
-  // Found the invoice — show Full/Partial payment buttons
+  // Found the invoice
   const totalAmount = Number(invoice.totalAmount);
   const amountPaid = Number(invoice.amountPaid || 0);
   const balanceDue = totalAmount - amountPaid;
 
   if (balanceDue <= 0) {
-    await sendTextMessage({ to: phone, text: `✅ Invoice #${invoice.invoiceNo} is already fully paid!` });
+    await sendTextMessage({ to: phone, text: `✅ Invoice *#${invoice.invoiceNo}* is already fully paid!` });
     return;
   }
 
@@ -140,7 +191,7 @@ async function handleMarkPaid(phone: string, input: string, user: User): Promise
     bodyText: [
       `💰 *Record Payment*`,
       `━━━━━━━━━━━━━━━━━━`,
-      `📄 Invoice: #${invoice.invoiceNo}`,
+      `📄 Invoice: *#${invoice.invoiceNo}*`,
       `👤 Client: ${invoice.client?.name}`,
       `🏷️ Total: ${formatCurrency(totalAmount)}`,
       paidLine,
@@ -184,7 +235,7 @@ export async function handlePaymentButton(phone: string, buttonId: string, user:
         text: [
           `✅ *Payment Recorded!*`,
           `━━━━━━━━━━━━━━━━━━`,
-          `📄 Invoice: #${invoiceNo}`,
+          `📄 Invoice: *#${invoiceNo}*`,
           `👤 Client: ${clientName}`,
           `💵 Paid: ${formatCurrency(balanceDue)}`,
           `📊 Status: *Fully Paid* ✅`,
@@ -256,7 +307,7 @@ async function handlePaymentAmountInput(
         text: [
           `✅ *Payment Recorded!*`,
           `━━━━━━━━━━━━━━━━━━`,
-          `📄 Invoice: #${invoiceNo}`,
+          `📄 Invoice: *#${invoiceNo}*`,
           `👤 Client: ${clientName}`,
           `💵 Paid now: ${formatCurrency(amount)}`,
           `📊 Status: *Fully Paid* ✅`,
@@ -270,7 +321,7 @@ async function handlePaymentAmountInput(
         text: [
           `✅ *Partial Payment Recorded!*`,
           `━━━━━━━━━━━━━━━━━━`,
-          `📄 Invoice: #${invoiceNo}`,
+          `📄 Invoice: *#${invoiceNo}*`,
           `👤 Client: ${clientName}`,
           `💵 Paid now: ${formatCurrency(amount)}`,
           `💰 Total paid: ${formatCurrency(Number(result.invoice.amountPaid))}`,
@@ -295,7 +346,7 @@ async function handleListPending(phone: string, user: User): Promise<void> {
   const pendingInvoices = await prisma.invoice.findMany({
     where: {
       userId: user.id,
-      status: { in: [InvoiceStatus.PENDING, InvoiceStatus.OVERDUE] },
+      status: { in: [InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE] },
     },
     include: { client: true },
     orderBy: { dueDate: 'asc' },
@@ -306,48 +357,73 @@ async function handleListPending(phone: string, user: User): Promise<void> {
     return;
   }
 
-  const totalPending = pendingInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
+  const totalPending = pendingInvoices.reduce((sum, inv) => {
+    const balance = Number(inv.totalAmount) - Number(inv.amountPaid || 0);
+    return sum + balance;
+  }, 0);
 
   let message = `📊 *Pending Summary*\n━━━━━━━━━━━━━━━━━━\n\n`;
   message += `💰 Total Pending: *${formatCurrency(totalPending)}*\n`;
   message += `📄 Invoices: ${pendingInvoices.length}\n\n`;
 
   for (const inv of pendingInvoices.slice(0, 8)) {
-    const status = inv.status === InvoiceStatus.OVERDUE ? '🔴' : '🟡';
-    message += `${status} #${inv.invoiceNo} — ${inv.client.name} — ${formatCurrency(Number(inv.totalAmount))}\n`;
+    const paid = Number(inv.amountPaid || 0);
+    const total = Number(inv.totalAmount);
+    const balance = total - paid;
+    const status = inv.status === InvoiceStatus.OVERDUE ? '🔴' :
+                   inv.status === InvoiceStatus.PARTIALLY_PAID ? '🟡' : '⚪';
+    const partialTag = paid > 0 ? ` (₹${paid} paid)` : '';
+    message += `${status} *#${inv.invoiceNo}*\n   ${inv.client.name} — ${formatCurrency(balance)} due${partialTag}\n\n`;
   }
 
   if (pendingInvoices.length > 8) {
-    message += `\n...and ${pendingInvoices.length - 8} more. View all at app.billkaro.in`;
+    message += `...and ${pendingInvoices.length - 8} more. View all at app.billkaro.in\n`;
   }
+
+  message += '━━━━━━━━━━━━━━━━━━\n';
+  message += '💡 _\"Paid #0004\"_ to record payment\n';
+  message += '💡 _\"Pause #0004\"_ to pause reminders';
 
   await sendTextMessage({ to: phone, text: message });
 }
 
 /**
- * Handle "pause reminders" command
+ * Handle "pause reminders" — invoice-number-first, client name fallback
  */
 async function handlePauseReminders(phone: string, input: string, user: User): Promise<void> {
-  // Try to find client name in input
-  const clients = await prisma.client.findMany({
-    where: { userId: user.id },
-    select: { id: true, name: true },
-  });
+  // 1. Try to find by invoice number
+  const invoice = await findInvoice(user.id, input);
 
-  for (const client of clients) {
-    if (input.toLowerCase().includes(client.name.toLowerCase())) {
-      const count = await pauseClientReminders(user.id, client.id);
-      await sendTextMessage({
-        to: phone,
-        text: `⏸️ Paused ${count} reminder(s) for ${client.name}.\n\nSay "resume ${client.name}" to restart.`,
+  if (invoice) {
+    // Pause reminders for this specific invoice
+    const { cancelReminders: cancelRem } = await import('../../services/reminder.service');
+    const reminders = await prisma.reminder.findMany({
+      where: {
+        invoiceId: invoice.id,
+        status: 'SCHEDULED',
+      },
+    });
+
+    let count = 0;
+    for (const reminder of reminders) {
+      await prisma.reminder.update({
+        where: { id: reminder.id },
+        data: { status: 'PAUSED' },
       });
-      return;
+      count++;
     }
+
+    await sendTextMessage({
+      to: phone,
+      text: `⏸️ Paused ${count} reminder(s) for invoice *#${invoice.invoiceNo}* (${invoice.client?.name || 'Client'}).\n\n💡 Say _\"Resume #${invoice.invoiceNo.split('-').pop()}\"_ to restart.`,
+    });
+    return;
   }
 
+  // 2. No match — show pending list
   await sendTextMessage({
     to: phone,
-    text: '🤔 Which client\'s reminders should I pause?\n\nTry: "Priya ke reminders band karo"',
+    text: '🤔 Which invoice should I pause reminders for?\n\n💡 Send:\n_\"Pause #0004\"_ or _\"Pause BK-MP-2604-0004\"_\n\nSay _\"pending\"_ to see your invoice list.',
   });
 }
 
@@ -377,9 +453,10 @@ async function handleEscalationAction(phone: string, action: string, user: User)
 
     case 'send_final_reminder':
       if (overdueInvoice.client.phone) {
+        const balance = Number(overdueInvoice.totalAmount) - Number(overdueInvoice.amountPaid || 0);
         await sendTextMessage({
           to: overdueInvoice.client.phone,
-          text: `Hi ${overdueInvoice.client.name},\n\nThis is a final reminder for invoice #${overdueInvoice.invoiceNo} for ${formatCurrency(Number(overdueInvoice.totalAmount))}.\n\nKindly clear the payment at your earliest convenience.\n\n💳 Pay now: ${overdueInvoice.paymentLink}\n\n— ${user.businessName}`,
+          text: `Hi ${overdueInvoice.client.name},\n\nThis is a final reminder for invoice #${overdueInvoice.invoiceNo} for ${formatCurrency(balance)}.\n\nKindly clear the payment at your earliest convenience.\n\n💳 Pay now: ${overdueInvoice.paymentLink}\n\n— ${user.businessName}`,
         });
         await sendTextMessage({ to: phone, text: `✅ Final reminder sent to ${overdueInvoice.client.name}.` });
       }
@@ -389,19 +466,40 @@ async function handleEscalationAction(phone: string, action: string, user: User)
       await cancelReminders(overdueInvoice.id);
       await sendTextMessage({
         to: phone,
-        text: `⏸️ Reminders paused for ${overdueInvoice.client.name} (#${overdueInvoice.invoiceNo}).`,
+        text: `⏸️ Reminders paused for *#${overdueInvoice.invoiceNo}* (${overdueInvoice.client.name}).`,
       });
       break;
   }
 }
 
 /**
- * Send help message
+ * Send help message — updated with invoice-number-based commands
  */
 async function sendHelpMessage(phone: string): Promise<void> {
   await sendTextMessage({
     to: phone,
-    text: `📖 *BillKaro Commands*\n━━━━━━━━━━━━━━━━━━\n\n📄 *Create Invoice:*\n"Bill 5000 to Rahul for AC repair"\n\n💰 *Check Pending:*\n"kitna baaki hai" or "pending"\n\n✅ *Mark Paid:*\n"Mark BK-2026-0001 paid"\nor "Rahul ne pay kar diya"\n\n⏸️ *Pause Reminders:*\n"Priya ke reminders band karo"\n\n🔄 *Resume Reminders:*\n"resume Priya"\n\n📊 *Dashboard:*\napp.billkaro.in`,
+    text: [
+      `📖 *BillKaro Commands*`,
+      `━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `📄 *Create Invoice:*`,
+      `"Bill 5000 to Rahul for AC repair"`,
+      ``,
+      `💰 *Check Pending:*`,
+      `"pending" or "kitna baaki hai"`,
+      ``,
+      `✅ *Record Payment:*`,
+      `"Paid #0004" or "Paid BK-MP-2604-0004"`,
+      ``,
+      `⏸️ *Pause Reminders:*`,
+      `"Pause #0004"`,
+      ``,
+      `🔄 *Resume Reminders:*`,
+      `"Resume #0004"`,
+      ``,
+      `📊 *Dashboard:*`,
+      `app.billkaro.in`,
+    ].join('\n'),
   });
 }
 
