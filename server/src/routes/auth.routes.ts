@@ -100,6 +100,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
          bankIfsc: true,
          bankAccountName: true,
          bankName: true,
+         defaultPaymentTermsDays: true,
          subscriptionPlan: true,
          subscriptionStatus: true,
          subscriptionExpiresAt: true,
@@ -136,6 +137,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
         onboardingComplete: user.onboardingComplete,
         upiId: user.upiId,
         address: user.businessAddress,
+        defaultPaymentTermsDays: user.defaultPaymentTermsDays,
         subscription: {
           plan: user.subscriptionPlan,
           status: user.subscriptionStatus,
@@ -160,17 +162,29 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
 router.patch('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     // businessName is intentionally excluded — it's set during onboarding only
-    const { upiId, address, bankAccountNo, bankIfsc, bankAccountName } = req.body;
+    const { upiId, address, bankAccountNo, bankIfsc, bankAccountName, defaultPaymentTermsDays } = req.body;
 
-    const updatedUser = await prisma.user.update({
-      where: { id: req.userId },
-      data: {
-        upiId,
-        businessAddress: address,
-        bankAccountNo,
-        bankIfsc,
-        bankAccountName,
+    // Validate payment terms if provided
+    const updateData: any = {
+      upiId,
+      businessAddress: address,
+      bankAccountNo,
+      bankIfsc,
+      bankAccountName,
+    };
+
+    if (defaultPaymentTermsDays !== undefined) {
+      const days = parseInt(defaultPaymentTermsDays, 10);
+      if (isNaN(days) || days < 1 || days > 90) {
+        res.status(400).json({ success: false, error: 'Payment terms must be between 1 and 90 days' });
+        return;
       }
+      updateData.defaultPaymentTermsDays = days;
+    }
+
+    await prisma.user.update({
+      where: { id: req.userId },
+      data: updateData,
     });
 
     res.json({ success: true, message: 'Profile updated' });

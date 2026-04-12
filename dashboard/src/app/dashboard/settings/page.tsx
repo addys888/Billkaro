@@ -17,7 +17,8 @@ export default function SettingsPage() {
     accountNo: '',
     ifsc: '',
     beneficiaryName: '',
-    address: ''
+    address: '',
+    defaultPaymentTermsDays: '7'
   });
 
   useEffect(() => {
@@ -36,7 +37,8 @@ export default function SettingsPage() {
            accountNo: res.user.bankDetails?.accountNo || '',
            ifsc: res.user.bankDetails?.ifsc || '',
            beneficiaryName: res.user.bankDetails?.beneficiaryName || '',
-           address: res.user.address || ''
+           address: res.user.address || '',
+           defaultPaymentTermsDays: String(res.user.defaultPaymentTermsDays || 7)
          });
       })
       .catch(err => {
@@ -61,7 +63,8 @@ export default function SettingsPage() {
            address: formData.address,
            bankAccountNo: formData.accountNo,
            bankIfsc: formData.ifsc,
-           bankAccountName: formData.beneficiaryName
+           bankAccountName: formData.beneficiaryName,
+           defaultPaymentTermsDays: parseInt(formData.defaultPaymentTermsDays, 10) || 7
         })
       });
       setMessage('Profile saved successfully!');
@@ -212,6 +215,28 @@ export default function SettingsPage() {
               placeholder="Full billing address to be embedded in invoices"
               style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none', resize: 'vertical' }}
             />
+          </div>
+
+          {/* Invoice Default Settings */}
+          <div style={{ padding: '20px', border: '1px dashed var(--color-border)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--color-bg)' }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text)' }}>Invoice Defaults</div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>Default Payment Terms (Days)</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <input 
+                  type="number" 
+                  name="defaultPaymentTermsDays"
+                  value={formData.defaultPaymentTermsDays}
+                  onChange={handleChange}
+                  min={1}
+                  max={90}
+                  style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none', width: '100px', textAlign: 'center', fontSize: '16px', fontWeight: 600 }}
+                />
+                <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>days</span>
+              </div>
+              <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Number of days after invoice creation before payment is due. Reminders will start from this date. (1–90 days)</span>
+            </div>
           </div>
         </div>
 
