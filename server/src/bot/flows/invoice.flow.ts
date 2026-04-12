@@ -62,22 +62,22 @@ export async function handleInvoiceFlow(
     return;
   }
 
-  if (input === '__ADVANCE_YES__') {
-    await updateSession(phone, { currentStep: 'advance_enter_amount' });
-    const total = formatCurrency(session.flowData.parsedInvoice?.amount || 0);
+  if (input === '__PAYMENT_YES__') {
+    await updateSession(phone, { currentStep: 'initial_payment_amount' });
+    const total = formatCurrency(session.flowData.totalAmount || 0);
     await sendTextMessage({
       to: phone,
-      text: `💰 How much advance did the client pay?\n\nInvoice total: ${total}\n\n_Send the advance amount (e.g. 5000):_`,
+      text: `💰 Enter the amount paid by client:\n\nInvoice total: ${total}\n\n_Send the amount (e.g. 5000):_`,
     });
     return;
   }
 
-  if (input === '__ADVANCE_NO__') {
-    // Full amount due — show send to client buttons
+  if (input === '__PAYMENT_NO__') {
+    // Full amount due — move to send-to-client
     await updateSession(phone, { currentStep: 'invoice_created' });
     await sendButtonMessage({
       to: phone,
-      bodyText: '✅ Full amount set as due.\n\n👉 *Forward this to your client?*',
+      bodyText: '✅ Full amount set as due. Reminders are scheduled.\n\n👉 *Forward this to your client?*',
       buttons: [
         { id: 'send_to_client', title: '📤 Send to Client' },
         { id: 'done_invoice', title: '📋 Done' },
@@ -86,39 +86,49 @@ export async function handleInvoiceFlow(
     return;
   }
 
-  // Handle advance payment amount input
-  if (step === 'advance_enter_amount') {
+  // Handle payment amount input (after invoice creation)
+  if (step === 'initial_payment_amount') {
     const amount = parseFloat(input.replace(/[₹,\s]/g, ''));
-    const totalAmount = Number(session.flowData.totalAmount || session.flowData.parsedInvoice?.amount || 0);
+    const totalAmount = Number(session.flowData.totalAmount || 0);
     
     if (isNaN(amount) || amount <= 0) {
       await sendTextMessage({ to: phone, text: '⚠️ Please enter a valid amount (e.g. 5000).' });
       return;
     }
-    if (amount >= totalAmount) {
-      await sendTextMessage({ to: phone, text: `⚠️ Advance (${formatCurrency(amount)}) can\'t be >= total (${formatCurrency(totalAmount)}).\nEnter a smaller amount:` });
+    if (amount > totalAmount) {
+      await sendTextMessage({ to: phone, text: `⚠️ Amount (${formatCurrency(amount)}) exceeds total (${formatCurrency(totalAmount)}).\nPlease enter a valid amount:` });
       return;
     }
 
     try {
       const { recordPayment } = await import('../../services/invoice.service');
       const invoiceId = session.flowData.invoiceId;
-      const result = await recordPayment({ invoiceId, amount, paymentMethod: 'advance' });
+      const result = await recordPayment({ invoiceId, amount, paymentMethod: 'upfront' });
 
       await updateSession(phone, { currentStep: 'invoice_created' });
+
+      const isFullyPaid = result.isFullyPaid;
 
       await sendTextMessage({
         to: phone,
         text: [
-          `✅ *Advance Payment Recorded!*`,
+          `✅ *Payment Recorded!*`,
           `━━━━━━━━━━━━━━━━━━`,
-          `💵 Advance: ${formatCurrency(amount)}`,
-          `📊 Balance due: *${formatCurrency(result.balanceDue)}*`,
-          `📊 Status: *Partially Paid* 🟡`,
+          `💵 Paid: ${formatCurrency(amount)}`,
+          isFullyPaid
+            ? `📊 Status: *Fully Paid* ✅`
+            : `📊 Balance due: *${formatCurrency(result.balanceDue)}*\n📊 Status: *Partially Paid* 🟡`,
+          '',
+          isFullyPaid ? '🎉 All reminders stopped.' : '⏰ Reminders will continue for remaining balance.',
           '',
           '👉 *Forward invoice to your client?*',
         ].join('\n'),
       });
+
+      if (isFullyPaid) {
+        const { cancelReminders } = await import('../../services/reminder.service');
+        await cancelReminders(invoiceId);
+      }
 
       await sendButtonMessage({
         to: phone,
@@ -129,8 +139,8 @@ export async function handleInvoiceFlow(
         ],
       });
     } catch (err: any) {
-      logger.error('Advance payment failed', { error: err.message });
-      await sendTextMessage({ to: phone, text: '❌ Failed to record advance. Please try again.' });
+      logger.error('Payment recording failed', { error: err.message });
+      await sendTextMessage({ to: phone, text: '❌ Failed to record payment. Please try again.' });
     }
     return;
   }
@@ -374,40 +384,28 @@ async function confirmAndSendInvoice(
       '👉 *Forward this to your client?*',
     ].filter(Boolean).join('\n');
 
-    // Check if merchant has advance payment enabled
-    
-    if (freshUser?.enableAdvancePayment) {
-      // Store total for advance amount validation
-      await updateSession(phone, {
-        currentStep: 'advance_choice',
-        flowData: {
-          ...session.flowData,
-          invoiceId: result.id,
-          invoiceNo: result.invoiceNo,
-          totalAmount: result.totalAmount,
-          pdfUrl: result.pdfUrl,
-          paymentLink: result.paymentLink,
-        },
-      });
+    // Store total for payment amount validation
+    await updateSession(phone, {
+      currentStep: 'payment_choice',
+      flowData: {
+        ...session.flowData,
+        invoiceId: result.id,
+        invoiceNo: result.invoiceNo,
+        totalAmount: result.totalAmount,
+        pdfUrl: result.pdfUrl,
+        paymentLink: result.paymentLink,
+      },
+    });
 
-      await sendButtonMessage({
-        to: phone,
-        bodyText: successMsg + '\n\n💰 Did the client make an advance payment?',
-        buttons: [
-          { id: 'advance_yes', title: '💰 Record Advance' },
-          { id: 'advance_no', title: '📋 Full Amount Due' },
-        ],
-      });
-    } else {
-      await sendButtonMessage({
-        to: phone,
-        bodyText: successMsg,
-        buttons: [
-          { id: 'send_to_client', title: '📤 Send to Client' },
-          { id: 'done_invoice', title: '📋 Done' },
-        ],
-      });
-    }
+    // Always ask if client paid anything (simple, universal)
+    await sendButtonMessage({
+      to: phone,
+      bodyText: successMsg + '\n\n💰 Did the client pay any amount?',
+      buttons: [
+        { id: 'payment_yes', title: '💰 Yes, Enter Amount' },
+        { id: 'payment_no', title: '❌ No, Full Due' },
+      ],
+    });
 
     // Send PDF as document attachment via WhatsApp media upload
     if (result.pdfBuffer) {
