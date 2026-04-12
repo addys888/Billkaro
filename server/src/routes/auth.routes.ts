@@ -159,12 +159,12 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
 // ── Update Current Profile ────────────────────────────────
 router.patch('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    const { businessName, upiId, address, bankAccountNo, bankIfsc, bankAccountName } = req.body;
+    // businessName is intentionally excluded — it's set during onboarding only
+    const { upiId, address, bankAccountNo, bankIfsc, bankAccountName } = req.body;
 
     const updatedUser = await prisma.user.update({
       where: { id: req.userId },
       data: {
-        businessName,
         upiId,
         businessAddress: address,
         bankAccountNo,

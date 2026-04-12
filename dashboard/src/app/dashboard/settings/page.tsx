@@ -57,7 +57,6 @@ export default function SettingsPage() {
       await apiFetch('/api/auth/me', {
         method: 'PATCH',
         body: JSON.stringify({
-           businessName: formData.businessName,
            upiId: formData.upiId,
            address: formData.address,
            bankAccountNo: formData.accountNo,
@@ -134,14 +133,19 @@ export default function SettingsPage() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>Business Name</label>
+            <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              Business Name
+              <span style={{ fontSize: '10px', background: 'var(--color-border)', color: 'var(--color-text-muted)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600, letterSpacing: '0.3px' }}>LOCKED</span>
+            </label>
             <input 
               type="text" 
               name="businessName"
               value={formData.businessName} 
-              onChange={handleChange}
-              style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none', transition: 'border-color 0.2s' }}
+              readOnly
+              disabled
+              style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '10px 12px', color: 'var(--color-text-muted)', outline: 'none', cursor: 'not-allowed', opacity: 0.7 }}
             />
+            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Business name is set during onboarding and cannot be changed here. Contact support if needed.</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
