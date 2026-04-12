@@ -80,7 +80,7 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
     },
   });
 
-  // Generate PDF (with hard timeout — Puppeteer can hang on low-memory containers)
+  // Generate PDF (with hard timeout — PDFKit is usually fast but guard against edge cases)
   let pdfUrl = '';
   let pdfBuf: Buffer | undefined;
   try {
@@ -107,6 +107,7 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
       gstAmount,
       totalAmount,
       notes: notes || undefined,
+      status: 'PENDING',
     });
 
     const timeoutPromise = new Promise<never>((_, reject) =>

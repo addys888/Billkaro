@@ -160,7 +160,7 @@ async function testWhatsAppMeta() {
 }
 
 async function testPDFGeneration() {
-  console.log('\n━━━ 6. PDF GENERATION (Puppeteer + Handlebars) ━━━');
+  console.log('\n━━━ 6. PDF GENERATION (PDFKit) ━━━');
   try {
     const { generateInvoicePDF, savePDFLocally } = require('./src/services/pdf.service');
     
@@ -184,6 +184,7 @@ async function testPDFGeneration() {
       gstAmount: 1080,
       totalAmount: 7080,
       notes: 'Test invoice for system health check',
+      status: 'PENDING' as const,
     };
 
     const startTime = Date.now();
