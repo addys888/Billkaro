@@ -1,6 +1,6 @@
 import { prisma } from '../../db/prisma';
 import { User } from '@prisma/client';
-import { sendTextMessage, sendButtonMessage, sendMediaMessage, uploadMedia } from '../../services/whatsapp.service';
+import { sendTextMessage, sendButtonMessage, sendMediaMessage, uploadMedia, sendTemplateMessage } from '../../services/whatsapp.service';
 import { parseInvoiceFromText, ParsedInvoice } from '../../services/nlu.service';
 import { createInvoice } from '../../services/invoice.service';
 import { scheduleReminders } from '../../services/reminder.service';
@@ -501,6 +501,22 @@ async function sendInvoiceToClient(
     msgParts.push(`— ${user.businessName}`);
 
     const clientMsg = msgParts.filter(Boolean).join('\n');
+
+    // For business-initiated messages (bot messaging client first), WhatsApp requires
+    // a template message to open the 24-hour conversation window.
+    // Send the hello_world template first, then follow up with the actual invoice.
+    try {
+      await sendTemplateMessage({
+        to: clientPhone,
+        templateName: 'hello_world',
+        languageCode: 'en_US',
+      });
+      // Small delay to ensure conversation window opens before sending freeform messages
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    } catch (templateErr: any) {
+      logger.warn('Template message failed, trying direct send', { error: templateErr?.message });
+      // If template fails, still try direct send — it might work if client messaged bot before
+    }
 
     await sendTextMessage({ to: clientPhone, text: clientMsg });
 
