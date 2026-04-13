@@ -328,6 +328,7 @@ export async function handleOnboardingStep(
         data: {
           enableAdvancePayment: enableAdvance,
           onboardingComplete: true,
+          defaultGstRate: 0, // Default GST is 0% — merchants with GSTIN can change per invoice
         },
       });
 

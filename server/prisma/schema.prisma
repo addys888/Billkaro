@@ -25,7 +25,7 @@ model User {
   bankAccountName        String?   @map("bank_account_name")
   bankName               String?   @map("bank_name")
   defaultPaymentTermsDays Int      @default(7) @map("default_payment_terms_days")
-  defaultGstRate         Decimal   @default(18) @map("default_gst_rate") @db.Decimal(4, 2)
+  defaultGstRate         Decimal   @default(0) @map("default_gst_rate") @db.Decimal(4, 2)
   enableAdvancePayment   Boolean   @default(false) @map("enable_advance_payment")
   onboardingComplete     Boolean   @default(false) @map("onboarding_complete")
   

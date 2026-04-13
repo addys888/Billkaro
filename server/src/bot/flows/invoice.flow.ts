@@ -197,8 +197,15 @@ async function sendConfirmationCard(
   parsed: ParsedInvoice,
   user: User
 ): Promise<void> {
-  // Use NLU-parsed GST rate if available, otherwise merchant's default
-  const gstRate = parsed.gstRate != null ? parsed.gstRate : Number(user.defaultGstRate);
+  const hasGstin = !!user.gstin;
+
+  // GST: no GSTIN = always 0%, with GSTIN = use parsed or default rate
+  let gstRate: number;
+  if (!hasGstin) {
+    gstRate = 0;
+  } else {
+    gstRate = parsed.gstRate != null ? parsed.gstRate : Number(user.defaultGstRate);
+  }
   const gstAmount = Math.round((parsed.amount * gstRate) / 100 * 100) / 100;
   const total = parsed.amount + gstAmount;
   const dueDays = parsed.dueDays || user.defaultPaymentTermsDays;
@@ -206,20 +213,28 @@ async function sendConfirmationCard(
 
   const itemsList = parsed.items.map((i) => i.name).join(', ');
 
-  const gstLabel = parsed.gstRate != null ? '(custom)' : '(default)';
-  const preview = [
+  const previewLines = [
     '📋 *Invoice Preview*',
     '',
     `👤 Client: *${parsed.clientName}*`,
     `💵 Amount: ${formatCurrency(parsed.amount)}`,
     `📦 Items: ${itemsList}`,
     parsed.notes ? `📝 Note: ${parsed.notes}` : '',
-    `🏷️ GST (${gstRate}%) ${gstLabel}: ${gstRate > 0 ? formatCurrency(gstAmount) : 'Nil'}`,
+  ];
+
+  if (hasGstin) {
+    const gstLabel = parsed.gstRate != null ? '(custom)' : '(default)';
+    previewLines.push(`🏷️ GST (${gstRate}%) ${gstLabel}: ${gstRate > 0 ? formatCurrency(gstAmount) : 'Nil'}`);
+  }
+
+  previewLines.push(
     `💰 Total: *${formatCurrency(total)}*`,
     `📅 Due: ${formatDateShort(dueDate)}`,
     '',
-    'Look good? _Tap Edit to change GST rate._',
-  ].filter(Boolean).join('\n');
+    hasGstin ? 'Look good? _Tap Edit to change GST rate._' : 'Look good?',
+  );
+
+  const preview = previewLines.filter(Boolean).join('\n');
 
   await sendButtonMessage({
     to: phone,

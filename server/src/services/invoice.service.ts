@@ -44,8 +44,13 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
   // Find or create client
   let client = await findOrCreateClient(userId, clientName, clientPhone);
 
-  // Calculate amounts — use custom GST rate if provided, otherwise merchant's default
-  const gstRate = customGstRate != null ? customGstRate : Number(user.defaultGstRate);
+  // GST logic: no GSTIN = no GST (always 0%), with GSTIN = use custom or default rate
+  let gstRate: number;
+  if (!user.gstin) {
+    gstRate = 0; // No GSTIN registered — GST not applicable
+  } else {
+    gstRate = customGstRate != null ? customGstRate : Number(user.defaultGstRate);
+  }
   const subtotal = amount;
   const gstAmount = Math.round((subtotal * gstRate) / 100 * 100) / 100;
   const totalAmount = subtotal + gstAmount;
