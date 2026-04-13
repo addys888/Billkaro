@@ -82,7 +82,7 @@ export default function DashboardPage() {
       </h2>
 
       {/* Primary KPI Cards (3 Cards) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '32px' }}>
+      <div className="dashboard-kpi-grid" style={{ display: 'grid', gap: '24px', marginBottom: '32px' }}>
         {/* Total Invoiced */}
         <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px', textAlign: 'center' }}>
           <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
@@ -159,7 +159,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Bottom 3 Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '24px' }}>
+      <div className="dashboard-bottom-grid" style={{ display: 'grid', gap: '24px' }}>
         
         {/* Collection Rate */}
         <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
