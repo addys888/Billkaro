@@ -384,7 +384,7 @@ async function handleListPending(phone: string, user: User): Promise<void> {
   }
 
   if (pendingInvoices.length > 8) {
-    message += `...and ${pendingInvoices.length - 8} more. View all at app.billkaro.in\n`;
+    message += `...and ${pendingInvoices.length - 8} more. View all at https://billkaro.celerapps.com\n`;
   }
 
   message += '━━━━━━━━━━━━━━━━━━\n';
@@ -505,7 +505,7 @@ async function sendHelpMessage(phone: string): Promise<void> {
       `"Resume #0004"`,
       ``,
       `📊 *Dashboard:*`,
-      `app.billkaro.in`,
+      `https://billkaro.celerapps.com`,
     ].join('\n'),
   });
 }

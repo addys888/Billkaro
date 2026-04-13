@@ -28,6 +28,9 @@ const envSchema = z.object({
   OPENAI_NLU_MODEL: z.string().default('gpt-4o-mini'),
   OPENAI_WHISPER_MODEL: z.string().default('whisper-1'),
 
+  // Google Gemini (FREE tier for screenshot analysis — get key at aistudio.google.com)
+  GEMINI_API_KEY: z.string().default(''),
+
   // No payment gateway needed — direct UPI + bank transfer (zero MDR)
 
   S3_ENDPOINT: z.string().default(''),

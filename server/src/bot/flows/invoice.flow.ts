@@ -505,7 +505,6 @@ async function sendInvoiceToClient(
     // ── 4. Build UPI pay link with BALANCE DUE (not total) ──
     const payAmount = balanceDue > 0 ? balanceDue : totalAmount;
     let upiPayLink = '';
-    let clickablePayLine = '';
     if (user.upiId && payAmount > 0) {
       upiPayLink = generateUPILink({
         upiId: user.upiId,
@@ -513,10 +512,9 @@ async function sendInvoiceToClient(
         amount: payAmount,
         transactionNote: `Invoice ${invoiceNo}`,
       });
-      clickablePayLine = `\n💳 *Click here to Pay:*\n${upiPayLink}\n`;
     }
 
-    // ── 5. Build partial payment info line ──
+    // ── 5. Build partial payment info ──
     let partialPayLine = '';
     if (amountPaid > 0 && balanceDue > 0) {
       partialPayLine = `\n✅ Advance received: ${formatCurrency(amountPaid)}\n💰 *Balance due: ${formatCurrency(balanceDue)}*\n`;
@@ -533,29 +531,58 @@ async function sendInvoiceToClient(
     });
 
     // ── 6. Build client message ──
-    const clientMsg = [
+    const msgParts: string[] = [
       `🧾 *Invoice from ${user.businessName}*`,
       `Hi ${parsedInvoice.clientName},`,
       '',
       `Please find your invoice *#${invoiceNo}* for *${formatCurrency(totalAmount)}* (${description}).`,
-      partialPayLine,
-      '━━━━━━━━━━━━━━━━━━',
-      '*💳 Payment Details:*',
-      user.upiId ? `📲 UPI ID: *${user.upiId}*` : '',
-      bankLine || '',
-      clickablePayLine,
+    ];
+
+    if (partialPayLine) {
+      msgParts.push(partialPayLine);
+    }
+
+    // Payment section
+    msgParts.push('━━━━━━━━━━━━━━━━━━');
+
+    if (balanceDue > 0 && upiPayLink) {
+      msgParts.push(
+        `💰 *Pay ${formatCurrency(payAmount)}*`,
+        '',
+        `📲 UPI ID: *${user.upiId}*`,
+      );
+      if (bankLine) msgParts.push(bankLine);
+      msgParts.push(
+        '',
+        `👇 _Tap below to pay instantly:_`,
+        upiPayLink,
+      );
+    } else {
+      msgParts.push('*💳 Payment Details:*');
+      if (user.upiId) msgParts.push(`📲 UPI ID: *${user.upiId}*`);
+      if (bankLine) msgParts.push(bankLine);
+    }
+
+    msgParts.push(
       '━━━━━━━━━━━━━━━━━━',
       '',
       `📅 Due by: ${formatDateShort(dueDate)}`,
-      `✅ *Zero convenience fee* — pay directly to our account`,
+      `✅ *Zero convenience fee* — pay directly`,
       '',
       `📎 _PDF invoice with QR code attached below_`,
       '',
-      balanceDue > 0
-        ? `After payment, please reply with your *UTR/Transaction ID* for instant confirmation. 🙏`
-        : `Thank you for your payment! 🙏`,
-      `— ${user.businessName}`,
-    ].filter(Boolean).join('\n');
+    );
+
+    if (balanceDue > 0) {
+      msgParts.push(
+        `After payment, please reply with your *UTR/Transaction ID* for confirmation. 🙏`,
+      );
+    } else {
+      msgParts.push(`Thank you for your payment! 🙏`);
+    }
+    msgParts.push(`— ${user.businessName}`);
+
+    const clientMsg = msgParts.filter(Boolean).join('\n');
 
     await sendTextMessage({ to: clientPhone, text: clientMsg });
 
