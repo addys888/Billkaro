@@ -62,89 +62,6 @@ export async function handleInvoiceFlow(
     return;
   }
 
-  if (input === '__PAYMENT_YES__') {
-    await updateSession(phone, { currentStep: 'initial_payment_amount' });
-    const total = formatCurrency(session.flowData.totalAmount || 0);
-    await sendTextMessage({
-      to: phone,
-      text: `💰 Enter the amount paid by client:\n\nInvoice total: ${total}\n\n_Send the amount (e.g. 5000):_`,
-    });
-    return;
-  }
-
-  if (input === '__PAYMENT_NO__') {
-    // Full amount due — move to send-to-client
-    await updateSession(phone, { currentStep: 'invoice_created' });
-    await sendButtonMessage({
-      to: phone,
-      bodyText: '✅ Full amount set as due. Reminders are scheduled.\n\n👉 *Forward this to your client?*',
-      buttons: [
-        { id: 'send_to_client', title: '📤 Send to Client' },
-        { id: 'done_invoice', title: '📋 Done' },
-      ],
-    });
-    return;
-  }
-
-  // Handle payment amount input (after invoice creation)
-  if (step === 'initial_payment_amount') {
-    const amount = parseFloat(input.replace(/[₹,\s]/g, ''));
-    const totalAmount = Number(session.flowData.totalAmount || 0);
-    
-    if (isNaN(amount) || amount <= 0) {
-      await sendTextMessage({ to: phone, text: '⚠️ Please enter a valid amount (e.g. 5000).' });
-      return;
-    }
-    if (amount > totalAmount) {
-      await sendTextMessage({ to: phone, text: `⚠️ Amount (${formatCurrency(amount)}) exceeds total (${formatCurrency(totalAmount)}).\nPlease enter a valid amount:` });
-      return;
-    }
-
-    try {
-      const { recordPayment } = await import('../../services/invoice.service');
-      const invoiceId = session.flowData.invoiceId;
-      const result = await recordPayment({ invoiceId, amount, paymentMethod: 'upfront' });
-
-      await updateSession(phone, { currentStep: 'invoice_created' });
-
-      const isFullyPaid = result.isFullyPaid;
-
-      await sendTextMessage({
-        to: phone,
-        text: [
-          `✅ *Payment Recorded!*`,
-          `━━━━━━━━━━━━━━━━━━`,
-          `💵 Paid: ${formatCurrency(amount)}`,
-          isFullyPaid
-            ? `📊 Status: *Fully Paid* ✅`
-            : `📊 Balance due: *${formatCurrency(result.balanceDue)}*\n📊 Status: *Partially Paid* 🟡`,
-          '',
-          isFullyPaid ? '🎉 All reminders stopped.' : '⏰ Reminders will continue for remaining balance.',
-          '',
-          '👉 *Forward invoice to your client?*',
-        ].join('\n'),
-      });
-
-      if (isFullyPaid) {
-        const { cancelReminders } = await import('../../services/reminder.service');
-        await cancelReminders(invoiceId);
-      }
-
-      await sendButtonMessage({
-        to: phone,
-        bodyText: 'What next?',
-        buttons: [
-          { id: 'send_to_client', title: '📤 Send to Client' },
-          { id: 'done_invoice', title: '📋 Done' },
-        ],
-      });
-    } catch (err: any) {
-      logger.error('Payment recording failed', { error: err.message });
-      await sendTextMessage({ to: phone, text: '❌ Failed to record payment. Please try again.' });
-    }
-    return;
-  }
-
   // ── Handle edit sub-steps ──
   if (step === 'edit_choice') {
     if (input === 'edit_amount') {
@@ -381,29 +298,15 @@ async function confirmAndSendInvoice(
       result.pdfUrl ? '📎 PDF invoice attached below' : '',
       '',
       '━━━━━━━━━━━━━━━━━━',
-      '👉 *Forward this to your client?*',
+      '💡 Send this to your client — they can pay and share UTR/screenshot for auto-verification.',
     ].filter(Boolean).join('\n');
 
-    // Store total for payment amount validation
-    await updateSession(phone, {
-      currentStep: 'payment_choice',
-      flowData: {
-        ...session.flowData,
-        invoiceId: result.id,
-        invoiceNo: result.invoiceNo,
-        totalAmount: result.totalAmount,
-        pdfUrl: result.pdfUrl,
-        paymentLink: result.paymentLink,
-      },
-    });
-
-    // Always ask if client paid anything (simple, universal)
     await sendButtonMessage({
       to: phone,
-      bodyText: successMsg + '\n\n💰 Did the client pay any amount?',
+      bodyText: successMsg,
       buttons: [
-        { id: 'payment_yes', title: '💰 Yes, Enter Amount' },
-        { id: 'payment_no', title: '❌ No, Full Due' },
+        { id: 'send_to_client', title: '📤 Send to Client' },
+        { id: 'done_invoice', title: '📋 Done' },
       ],
     });
 
@@ -609,9 +512,10 @@ async function sendInvoiceToClient(
       `✅ Invoice *#${invoiceNo}* sent to ${parsedInvoice.clientName}! 🎉`,
       '',
       `📱 Sent to: ${clientPhone}`,
-      amountPaid > 0 ? `💵 Advance: ${formatCurrency(amountPaid)} | Balance Due: ${formatCurrency(balanceDue)}` : '',
-      balanceDue > 0 ? '⏰ Reminders are scheduled automatically.' : '✅ Fully paid — no reminders needed.',
+      `💵 Total Due: ${formatCurrency(balanceDue)}`,
+      '⏰ Reminders are scheduled automatically.',
       '',
+      '💡 When client pays & shares UTR/screenshot, payment will be verified automatically.',
       '💡 Send another invoice anytime.',
     ].filter(Boolean).join('\n');
 
