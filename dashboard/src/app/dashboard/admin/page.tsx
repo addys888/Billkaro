@@ -172,7 +172,11 @@ export default function AdminPage() {
                       </div>
                     </td>
                     <td style={{ padding: '16px 24px' }}>
-                      <div style={{ fontSize: '13px' }}>{u.subscriptionExpiresAt ? formatDate(u.subscriptionExpiresAt) : 'N/A'}</div>
+                      {['919452661608', '919082573335'].includes(u.phone) ? (
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#22c55e', background: 'rgba(34, 197, 94, 0.1)', padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(34, 197, 94, 0.2)' }}>∞ Never Expires</span>
+                      ) : (
+                        <div style={{ fontSize: '13px' }}>{u.subscriptionExpiresAt ? formatDate(u.subscriptionExpiresAt) : 'N/A'}</div>
+                      )}
                     </td>
                     <td style={{ padding: '16px 24px', textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', minHeight: '32px' }}>
