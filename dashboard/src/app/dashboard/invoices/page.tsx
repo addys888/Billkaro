@@ -6,6 +6,13 @@ import { formatCurrency, formatDate, getStatusBadge } from '@/lib/utils';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
+interface Payment {
+  amount: number;
+  transactionId: string | null;
+  paymentMethod: string | null;
+  createdAt: string;
+}
+
 interface Invoice {
   id: string;
   invoiceNo: string;
@@ -17,9 +24,11 @@ interface Invoice {
   description: string | null;
   pdfUrl: string | null;
   paymentLink: string | null;
+  sentToClient: boolean;
   dueDate: string;
   paidAt: string | null;
   createdAt: string;
+  payments: Payment[];
 }
 
 interface InvoiceResponse {
@@ -102,9 +111,10 @@ export default function InvoicesPage() {
         return;
       }
       
-      const headers = ['Invoice No', 'Client Name', 'Client Phone', 'Amount', 'Paid', 'Balance', 'Status', 'Date', 'Due Date'];
+      const headers = ['Invoice No', 'Client Name', 'Client Phone', 'Amount', 'Paid', 'Balance', 'UTR', 'Status', 'Date', 'Due Date'];
       const csvData = result.invoices.map(inv => {
         const balance = inv.totalAmount - inv.amountPaid;
+        const latestUTR = inv.payments?.find(p => p.transactionId && p.transactionId !== 'SCREENSHOT')?.transactionId || '';
         return [
           inv.invoiceNo,
           `"${inv.clientName}"`,
@@ -112,6 +122,7 @@ export default function InvoicesPage() {
           inv.totalAmount,
           inv.amountPaid,
           balance,
+          latestUTR,
           inv.status,
           formatDate(inv.createdAt),
           formatDate(inv.dueDate)
@@ -209,9 +220,9 @@ export default function InvoicesPage() {
                 <th>Client</th>
                 <th>Amount</th>
                 <th>Paid</th>
+                <th>UTR / Ref</th>
                 <th>Status</th>
                 <th>Date</th>
-                <th>Due Date</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -232,8 +243,22 @@ export default function InvoicesPage() {
                       <td style={{ fontWeight: 600, color: '#2563eb' }}>{inv.invoiceNo}</td>
                       <td>
                         <div style={{ fontWeight: 500 }}>{inv.clientName}</div>
+                        {inv.clientPhone ? (
+                          <a
+                            href={`https://wa.me/${inv.clientPhone}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs"
+                            style={{ color: '#25D366', textDecoration: 'none' }}
+                            title={`WhatsApp ${inv.clientName}`}
+                          >
+                            📱 {inv.clientPhone.replace(/^91/, '+91 ')}
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted">No phone</span>
+                        )}
                         {inv.description && (
-                          <div className="text-xs text-muted">{inv.description}</div>
+                          <div className="text-xs text-muted" style={{ marginTop: 2 }}>{inv.description}</div>
                         )}
                       </td>
                       <td style={{ fontWeight: 700 }}>{formatCurrency(inv.totalAmount)}</td>
@@ -251,9 +276,39 @@ export default function InvoicesPage() {
                           <span className="text-xs text-muted">—</span>
                         )}
                       </td>
+                      <td>
+                        {inv.payments && inv.payments.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            {inv.payments.slice(0, 2).map((p, idx) => (
+                              <div key={idx} style={{ fontSize: '0.75rem' }}>
+                                {p.transactionId && p.transactionId !== 'SCREENSHOT' ? (
+                                  <span
+                                    style={{ cursor: 'pointer', color: '#2563eb', fontFamily: 'monospace', fontSize: '0.7rem' }}
+                                    title={`Click to copy: ${p.transactionId}`}
+                                    onClick={() => { navigator.clipboard.writeText(p.transactionId!); }}
+                                  >
+                                    🔖 {p.transactionId.length > 12 ? p.transactionId.substring(0, 12) + '…' : p.transactionId}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted" style={{ fontSize: '0.7rem' }}>
+                                    {p.paymentMethod === 'upi' ? '📲 UPI' : '💵 Manual'}
+                                  </span>
+                                )}
+                                <span className="text-muted" style={{ fontSize: '0.65rem', marginLeft: 4 }}>
+                                  {formatCurrency(p.amount)}
+                                </span>
+                              </div>
+                            ))}
+                            {inv.payments.length > 2 && (
+                              <span className="text-xs text-muted">+{inv.payments.length - 2} more</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted">—</span>
+                        )}
+                      </td>
                       <td><span className={`badge ${badge.className}`}>{badge.label}</span></td>
                       <td className="text-sm text-secondary">{formatDate(inv.createdAt)}</td>
-                      <td className="text-sm text-secondary">{formatDate(inv.dueDate)}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 4 }}>
                           {inv.status !== 'PAID' && (
@@ -292,7 +347,7 @@ export default function InvoicesPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={9}>
                     <div className="empty-state">
                       <div className="icon">📄</div>
                       <h3>No invoices found</h3>
