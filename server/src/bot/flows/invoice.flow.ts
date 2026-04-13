@@ -609,7 +609,7 @@ async function sendInvoiceToClient(
       `✅ Invoice *#${invoiceNo}* sent to ${parsedInvoice.clientName}! 🎉`,
       '',
       `📱 Sent to: ${clientPhone}`,
-      amountPaid > 0 ? `💵 Paid: ${formatCurrency(amountPaid)} | Balance: ${formatCurrency(balanceDue)}` : '',
+      amountPaid > 0 ? `💵 Advance: ${formatCurrency(amountPaid)} | Balance Due: ${formatCurrency(balanceDue)}` : '',
       balanceDue > 0 ? '⏰ Reminders are scheduled automatically.' : '✅ Fully paid — no reminders needed.',
       '',
       '💡 Send another invoice anytime.',
