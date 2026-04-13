@@ -450,7 +450,7 @@ async function sendInvoiceToClient(
   user: User,
   session: SessionData
 ): Promise<void> {
-  const { invoiceNo, pdfUrl, paymentLink, parsedInvoice } = session.flowData;
+  const { invoiceNo, invoiceId, pdfUrl, parsedInvoice } = session.flowData;
   let clientPhone = session.flowData.clientPhone;
 
   if (!clientPhone) {
@@ -464,26 +464,64 @@ async function sendInvoiceToClient(
   }
 
   try {
-    // Fetch the actual invoice from DB to get the REAL total (with correct GST)
+    // ── 1. Fetch the actual invoice from DB ──
     const invoice = await prisma.invoice.findFirst({
       where: { invoiceNo },
-      select: { totalAmount: true, dueDate: true, description: true },
+      include: { client: true },
     });
 
-    const total = invoice ? Number(invoice.totalAmount) : (parsedInvoice.amount || 0);
-    const description = invoice?.description || parsedInvoice.items.map((i: any) => i.name).join(', ');
-    const dueDate = invoice?.dueDate ? new Date(invoice.dueDate) : addDays(new Date(), parsedInvoice.dueDays || user.defaultPaymentTermsDays);
+    if (!invoice) {
+      await sendTextMessage({ to: phone, text: '❌ Invoice not found. Please try again.' });
+      await clearSession(phone);
+      return;
+    }
 
-    // Generate UPI pay link for the WhatsApp message
-    let upiPayLine = '';
-    if (user.upiId) {
-      const upiLink = generateUPILink({
+    const totalAmount = Number(invoice.totalAmount);
+    const amountPaid = Number(invoice.amountPaid || 0);
+    const balanceDue = totalAmount - amountPaid;
+    const description = invoice.description || parsedInvoice.items?.map((i: any) => i.name).join(', ') || 'Services';
+    const dueDate = new Date(invoice.dueDate);
+
+    // ── 2. Save client phone to DB if not already set ──
+    if (invoice.client && !invoice.client.phone) {
+      try {
+        await prisma.client.update({
+          where: { id: invoice.clientId },
+          data: { phone: clientPhone },
+        });
+        logger.info('Client phone saved', { clientId: invoice.clientId, phone: clientPhone });
+      } catch (phoneErr: any) {
+        // May fail if phone already exists for another client (unique constraint)
+        logger.warn('Could not save client phone', { error: phoneErr.message });
+      }
+    }
+
+    // ── 3. Mark invoice as sent to client ──
+    await prisma.invoice.update({
+      where: { id: invoice.id },
+      data: { sentToClient: true },
+    });
+
+    // ── 4. Build UPI pay link with BALANCE DUE (not total) ──
+    const payAmount = balanceDue > 0 ? balanceDue : totalAmount;
+    let upiPayLink = '';
+    let clickablePayLine = '';
+    if (user.upiId && payAmount > 0) {
+      upiPayLink = generateUPILink({
         upiId: user.upiId,
         payeeName: user.businessName,
-        amount: total,
+        amount: payAmount,
         transactionNote: `Invoice ${invoiceNo}`,
       });
-      upiPayLine = `📲 *Pay via UPI:* ${upiLink}`;
+      clickablePayLine = `\n💳 *Click here to Pay:*\n${upiPayLink}\n`;
+    }
+
+    // ── 5. Build partial payment info line ──
+    let partialPayLine = '';
+    if (amountPaid > 0 && balanceDue > 0) {
+      partialPayLine = `\n✅ Advance received: ${formatCurrency(amountPaid)}\n💰 *Balance due: ${formatCurrency(balanceDue)}*\n`;
+    } else if (amountPaid > 0 && balanceDue <= 0) {
+      partialPayLine = `\n✅ *Fully Paid — Thank You!* 🎉\n`;
     }
 
     // Bank details fallback
@@ -494,27 +532,28 @@ async function sendInvoiceToClient(
       bankName: user.bankName,
     });
 
-    // Send invoice message to client
+    // ── 6. Build client message ──
     const clientMsg = [
       `🧾 *Invoice from ${user.businessName}*`,
-      '',
       `Hi ${parsedInvoice.clientName},`,
       '',
-      `Please find your invoice #${invoiceNo} for *${formatCurrency(total)}* (${description}).`,
-      '',
+      `Please find your invoice *#${invoiceNo}* for *${formatCurrency(totalAmount)}* (${description}).`,
+      partialPayLine,
       '━━━━━━━━━━━━━━━━━━',
       '*💳 Payment Details:*',
       user.upiId ? `📲 UPI ID: *${user.upiId}*` : '',
       bankLine || '',
+      clickablePayLine,
       '━━━━━━━━━━━━━━━━━━',
       '',
       `📅 Due by: ${formatDateShort(dueDate)}`,
-      '',
       `✅ *Zero convenience fee* — pay directly to our account`,
       '',
       `📎 _PDF invoice with QR code attached below_`,
       '',
-      `Thank you for your business! 🙏`,
+      balanceDue > 0
+        ? `After payment, please reply with your *UTR/Transaction ID* for instant confirmation. 🙏`
+        : `Thank you for your payment! 🙏`,
       `— ${user.businessName}`,
     ].filter(Boolean).join('\n');
 
@@ -538,11 +577,18 @@ async function sendInvoiceToClient(
       }
     }
 
-    await sendTextMessage({
-      to: phone,
-      text: `✅ Invoice #${invoiceNo} sent to ${parsedInvoice.clientName}! 🎉\n\nReminders are scheduled automatically.`,
-    });
+    // ── 7. Confirm to merchant ──
+    const confirmMsg = [
+      `✅ Invoice *#${invoiceNo}* sent to ${parsedInvoice.clientName}! 🎉`,
+      '',
+      `📱 Sent to: ${clientPhone}`,
+      amountPaid > 0 ? `💵 Paid: ${formatCurrency(amountPaid)} | Balance: ${formatCurrency(balanceDue)}` : '',
+      balanceDue > 0 ? '⏰ Reminders are scheduled automatically.' : '✅ Fully paid — no reminders needed.',
+      '',
+      '💡 Send another invoice anytime.',
+    ].filter(Boolean).join('\n');
 
+    await sendTextMessage({ to: phone, text: confirmMsg });
     await clearSession(phone);
   } catch (error: any) {
     const errMsg = error?.message || 'Unknown error';
