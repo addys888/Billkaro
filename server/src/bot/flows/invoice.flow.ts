@@ -545,11 +545,31 @@ async function sendInvoiceToClient(
       errorStack: error?.stack,
     });
 
-    // Check if it's a WhatsApp API restriction (test number can only message verified recipients)
-    const isRecipientError = errMsg.includes('not a valid WhatsApp') || errMsg.includes('1013') || errMsg.includes('131030');
-    const userMsg = isRecipientError
-      ? `❌ Could not send to ${clientPhone}. This number may not be registered on WhatsApp, or your Meta test number can only message verified recipients.\n\n💡 Add the recipient in Meta Developer Console → WhatsApp → API Setup → "To" field.`
-      : `❌ Failed to send to client: ${errMsg.substring(0, 100)}\n\nYou can share the invoice manually via the PDF.`;
+    // Parse the actual WhatsApp API error for better diagnostics
+    let apiErrorCode = '';
+    let apiErrorDetail = '';
+    try {
+      // Our WhatsApp service throws errors like: "WhatsApp API error (400): {\"error\":{...}}"
+      const jsonMatch = errMsg.match(/\{.*\}/s);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        apiErrorCode = parsed?.error?.code?.toString() || '';
+        apiErrorDetail = parsed?.error?.error_data?.details || parsed?.error?.message || '';
+      }
+    } catch (_) { /* ignore parse errors */ }
+
+    // Build diagnostic message
+    const isRecipientError = errMsg.includes('not a valid WhatsApp') || errMsg.includes('1013') || errMsg.includes('131030') || apiErrorCode === '131030';
+    const isAuthError = errMsg.includes('401') || errMsg.includes('190') || apiErrorCode === '190';
+    
+    let userMsg: string;
+    if (isAuthError) {
+      userMsg = `❌ WhatsApp token expired! Please generate a new access token in Meta Developer Console and update the server.\n\n🔧 Error: Token invalid or expired.`;
+    } else if (isRecipientError) {
+      userMsg = `❌ Could not send to ${clientPhone}. This number may not be registered on WhatsApp, or your Meta test number can only message verified recipients.\n\n💡 Add the recipient in Meta Developer Console → WhatsApp → API Setup → "To" field.`;
+    } else {
+      userMsg = `❌ Failed to send invoice to client.\n\n🔧 Error: ${apiErrorDetail || errMsg.substring(0, 150)}\n\nYou can share the invoice manually via the PDF.`;
+    }
 
     await sendTextMessage({ to: phone, text: userMsg });
     await clearSession(phone);
