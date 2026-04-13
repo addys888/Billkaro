@@ -464,12 +464,15 @@ async function sendInvoiceToClient(
   }
 
   try {
-    const gstRate = Number(user.defaultGstRate);
-    const gstAmount = Math.round((parsedInvoice.amount * gstRate) / 100 * 100) / 100;
-    const total = parsedInvoice.amount + gstAmount;
-    const description = parsedInvoice.items.map((i: any) => i.name).join(', ');
-    const dueDays = parsedInvoice.dueDays || user.defaultPaymentTermsDays;
-    const dueDate = addDays(new Date(), dueDays);
+    // Fetch the actual invoice from DB to get the REAL total (with correct GST)
+    const invoice = await prisma.invoice.findFirst({
+      where: { invoiceNo },
+      select: { totalAmount: true, dueDate: true, description: true },
+    });
+
+    const total = invoice ? Number(invoice.totalAmount) : (parsedInvoice.amount || 0);
+    const description = invoice?.description || parsedInvoice.items.map((i: any) => i.name).join(', ');
+    const dueDate = invoice?.dueDate ? new Date(invoice.dueDate) : addDays(new Date(), parsedInvoice.dueDays || user.defaultPaymentTermsDays);
 
     // Generate UPI pay link for the WhatsApp message
     let upiPayLine = '';

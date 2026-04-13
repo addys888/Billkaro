@@ -100,6 +100,10 @@ export async function handleIncomingMessage(message: any, senderPhone: string): 
         case 'invoice':
           await handleInvoiceFlow(senderPhone, text, user, session);
           return;
+        case 'record_payment':
+          // Payment amount input (e.g. "5000") — route to command handler
+          await handleCommand(senderPhone, text, user);
+          return;
         case 'onboarding':
           await handleOnboardingStep(senderPhone, text, user);
           return;

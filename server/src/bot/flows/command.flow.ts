@@ -233,14 +233,17 @@ export async function handlePaymentButton(phone: string, buttonId: string, user:
       await sendTextMessage({
         to: phone,
         text: [
-          `✅ *Payment Recorded!*`,
+          `✅ *Payment Recorded — Thank You!* 🎉`,
           `━━━━━━━━━━━━━━━━━━`,
           `📄 Invoice: *#${invoiceNo}*`,
           `👤 Client: ${clientName}`,
           `💵 Paid: ${formatCurrency(balanceDue)}`,
           `📊 Status: *Fully Paid* ✅`,
           '',
-          '🎉 All reminders stopped.',
+          '🔔 All reminders stopped automatically.',
+          '',
+          '🙏 Payment collected successfully!',
+          '💡 Send another invoice anytime.',
         ].join('\n'),
       });
     } catch (err: any) {
@@ -305,21 +308,24 @@ async function handlePaymentAmountInput(
       await sendTextMessage({
         to: phone,
         text: [
-          `✅ *Payment Recorded!*`,
+          `✅ *Payment Recorded — Thank You!* 🎉`,
           `━━━━━━━━━━━━━━━━━━`,
           `📄 Invoice: *#${invoiceNo}*`,
           `👤 Client: ${clientName}`,
           `💵 Paid now: ${formatCurrency(amount)}`,
           `📊 Status: *Fully Paid* ✅`,
           '',
-          '🎉 All reminders stopped.',
+          '🔔 All reminders stopped automatically.',
+          '',
+          '🙏 Payment collected successfully!',
+          '💡 Send another invoice anytime.',
         ].join('\n'),
       });
     } else {
       await sendTextMessage({
         to: phone,
         text: [
-          `✅ *Partial Payment Recorded!*`,
+          `✅ *Partial Payment Recorded — Thank You!* 👍`,
           `━━━━━━━━━━━━━━━━━━`,
           `📄 Invoice: *#${invoiceNo}*`,
           `👤 Client: ${clientName}`,
@@ -328,7 +334,8 @@ async function handlePaymentAmountInput(
           `📊 Balance due: *${formatCurrency(result.balanceDue)}*`,
           `📊 Status: *Partially Paid* 🟡`,
           '',
-          '⏰ Reminders will continue for the remaining balance.',
+          '⏰ Reminders will continue for ₹' + result.balanceDue.toLocaleString('en-IN') + '.',
+          '💡 Say _"Paid #' + invoiceNo.split('-').pop() + '"_ when balance is cleared.',
         ].join('\n'),
       });
     }
