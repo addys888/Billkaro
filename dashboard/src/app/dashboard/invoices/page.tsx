@@ -279,26 +279,40 @@ export default function InvoicesPage() {
                       <td>
                         {inv.payments && inv.payments.length > 0 ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                            {inv.payments.slice(0, 2).map((p, idx) => (
+                            {inv.payments.slice(0, 2).map((p, idx) => {
+                              // Parse transactionId: "UTR_NUMBER | DATE" or just "UTR_NUMBER"
+                              const parts = p.transactionId?.split(' | ') || [];
+                              const utrPart = parts[0] || p.transactionId || '';
+                              const datePart = parts[1] || '';
+                              const isScreenshot = utrPart === 'SCREENSHOT';
+
+                              return (
                               <div key={idx} style={{ fontSize: '0.75rem' }}>
-                                {p.transactionId && p.transactionId !== 'SCREENSHOT' ? (
+                                {utrPart && !isScreenshot ? (
                                   <span
                                     style={{ cursor: 'pointer', color: '#2563eb', fontFamily: 'monospace', fontSize: '0.7rem' }}
-                                    title={`Click to copy: ${p.transactionId}`}
-                                    onClick={() => { navigator.clipboard.writeText(p.transactionId!); }}
+                                    title={`Click to copy: ${utrPart}`}
+                                    onClick={() => { navigator.clipboard.writeText(utrPart); }}
                                   >
-                                    🔖 {p.transactionId.length > 12 ? p.transactionId.substring(0, 12) + '…' : p.transactionId}
+                                    🔖 {utrPart}
                                   </span>
                                 ) : (
                                   <span className="text-muted" style={{ fontSize: '0.7rem' }}>
                                     {p.paymentMethod === 'upi' ? '📲 UPI' : '💵 Manual'}
                                   </span>
                                 )}
-                                <span className="text-muted" style={{ fontSize: '0.65rem', marginLeft: 4 }}>
-                                  {formatCurrency(p.amount)}
-                                </span>
+                                {datePart ? (
+                                  <div className="text-muted" style={{ fontSize: '0.6rem', marginTop: 1 }}>
+                                    🕐 {new Date(datePart).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted" style={{ fontSize: '0.65rem', marginLeft: 4 }}>
+                                    {formatCurrency(p.amount)}
+                                  </span>
+                                )}
                               </div>
-                            ))}
+                              );
+                            })}
                             {inv.payments.length > 2 && (
                               <span className="text-xs text-muted">+{inv.payments.length - 2} more</span>
                             )}
