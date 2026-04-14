@@ -593,26 +593,24 @@ async function sendInvoiceToClient(
       }
     }
 
-    // Also send freeform text (works for production numbers or existing conversations)
-    try {
+    // Only send freeform text + separate PDF if NO template was delivered
+    // (avoids duplicate messages when template already includes the invoice details)
+    if (!templateSent) {
       await sendTextMessage({ to: clientPhone, text: clientMsg });
-    } catch (textErr: any) {
-      if (!templateSent) throw textErr;
-      logger.warn('Freeform invoice text not delivered (test number limitation)', { error: textErr?.message });
-    }
 
-    // Send PDF separately if not already sent via template
-    if (pdfMediaId && !pdfSentViaTemplate) {
-      try {
-        await sendMediaMessage({
-          to: clientPhone,
-          type: 'document',
-          mediaId: pdfMediaId,
-          caption: `Invoice #${invoiceNo}`,
-          filename: `${invoiceNo}.pdf`,
-        });
-      } catch (pdfError) {
-        logger.warn('Failed to send PDF to client', { invoiceNo, error: pdfError });
+      // Send PDF separately
+      if (pdfMediaId) {
+        try {
+          await sendMediaMessage({
+            to: clientPhone,
+            type: 'document',
+            mediaId: pdfMediaId,
+            caption: `Invoice #${invoiceNo}`,
+            filename: `${invoiceNo}.pdf`,
+          });
+        } catch (pdfError) {
+          logger.warn('Failed to send PDF to client', { invoiceNo, error: pdfError });
+        }
       }
     }
 

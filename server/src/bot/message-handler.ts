@@ -477,6 +477,12 @@ async function handleImageMessage(senderPhone: string, imageId: string, mimeType
     // ── Record the payment ──
     const paymentAmount = validation.paymentAmount;
     const utrNumber = extracted.utrNumber || 'SCREENSHOT';
+    const paymentDate = extracted.date || new Date().toISOString();
+
+    // Store UTR + date in transactionId for dashboard UTR/REF column
+    const transactionRef = extracted.utrNumber
+      ? `${utrNumber} | ${paymentDate}`
+      : `SCREENSHOT | ${paymentDate}`;
 
     try {
       const { recordPayment } = await import('../services/invoice.service');
@@ -484,8 +490,8 @@ async function handleImageMessage(senderPhone: string, imageId: string, mimeType
         invoiceId: invoice.id,
         amount: paymentAmount,
         paymentMethod: 'upi',
-        transactionId: utrNumber,
-        notes: `Via screenshot | Payer: ${extracted.payerName || 'N/A'} | UPI: ${extracted.payerUpiId || 'N/A'}`,
+        transactionId: transactionRef,
+        notes: `Via screenshot | Payer: ${extracted.payerName || 'N/A'} | UPI: ${extracted.payerUpiId || 'N/A'} | Date: ${paymentDate}`,
       });
 
       const newBalance = result.balanceDue;
