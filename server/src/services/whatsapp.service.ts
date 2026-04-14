@@ -92,7 +92,12 @@ export async function sendTemplateMessage(params: {
   languageCode?: string;
   components?: Array<{
     type: string;
-    parameters: Array<{ type: string; text?: string }>;
+    parameters: Array<{
+      type: string;
+      text?: string;
+      document?: { id: string; filename?: string; link?: string };
+      image?: { id?: string; link?: string };
+    }>;
   }>;
 }): Promise<void> {
   const { to, templateName, languageCode = 'en', components = [] } = params;

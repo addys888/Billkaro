@@ -503,67 +503,111 @@ async function sendInvoiceToClient(
     const clientMsg = msgParts.filter(Boolean).join('\n');
 
     // With Meta test numbers, ONLY template messages get delivered to new clients.
-    // Freeform text is accepted by the API but silently dropped.
-    // Strategy: try custom invoice template → fallback to hello_world → fallback to freeform
+    // Strategy: try invoice_with_pdf (includes PDF) → invoice_notification → hello_world → freeform
     let templateSent = false;
+    let pdfSentViaTemplate = false;
 
-    // Try custom invoice_notification template (if approved)
-    try {
-      await sendTemplateMessage({
-        to: clientPhone,
-        templateName: 'invoice_notification',
-        languageCode: 'en',
-        components: [
-          {
-            type: 'body',
-            parameters: [
-              { type: 'text', text: parsedInvoice.clientName },
-              { type: 'text', text: user.businessName },
-              { type: 'text', text: invoiceNo },
-              { type: 'text', text: formatCurrency(totalAmount) },
-              { type: 'text', text: formatDateShort(dueDate) },
-              { type: 'text', text: user.upiId || 'N/A' },
-            ],
-          },
-        ],
-      });
-      templateSent = true;
-      logger.info('Invoice sent via invoice_notification template', { invoiceNo, clientPhone });
-    } catch (templateErr: any) {
-      logger.warn('invoice_notification template failed, trying hello_world', { error: templateErr?.message });
-
-      // Fallback: send hello_world template so client at least gets notified
-      try {
-        await sendTemplateMessage({
-          to: clientPhone,
-          templateName: 'hello_world',
-          languageCode: 'en_US',
-        });
-        templateSent = true;
-        logger.info('Invoice notification sent via hello_world fallback', { invoiceNo, clientPhone });
-      } catch (helloErr: any) {
-        logger.warn('hello_world template also failed', { error: helloErr?.message });
-      }
-    }
-
-    // Also send the full invoice text (works for production numbers or existing conversations)
-    try {
-      await sendTextMessage({ to: clientPhone, text: clientMsg });
-    } catch (textErr: any) {
-      if (!templateSent) throw textErr; // Re-throw only if no template was sent either
-      logger.warn('Freeform invoice text not delivered (test number limitation)', { error: textErr?.message });
-    }
-
-    // Send PDF if available
+    // Upload PDF first if available (needed for template header)
+    let pdfMediaId: string | null = null;
     if (pdfUrl) {
       try {
         const pdfBuffer = await getPDFBuffer(pdfUrl);
-        const mediaId = await uploadMedia(pdfBuffer, `${invoiceNo}.pdf`, 'application/pdf');
+        pdfMediaId = await uploadMedia(pdfBuffer, `${invoiceNo}.pdf`, 'application/pdf');
+      } catch (pdfErr: any) {
+        logger.warn('Failed to upload PDF for template', { error: pdfErr?.message });
+      }
+    }
 
+    // Try invoice_with_pdf template (includes PDF as document header)
+    if (pdfMediaId) {
+      try {
+        await sendTemplateMessage({
+          to: clientPhone,
+          templateName: 'invoice_with_pdf',
+          languageCode: 'en',
+          components: [
+            {
+              type: 'header',
+              parameters: [
+                { type: 'document', document: { id: pdfMediaId, filename: `${invoiceNo}.pdf` } },
+              ],
+            },
+            {
+              type: 'body',
+              parameters: [
+                { type: 'text', text: parsedInvoice.clientName },
+                { type: 'text', text: user.businessName },
+                { type: 'text', text: invoiceNo },
+                { type: 'text', text: formatCurrency(totalAmount) },
+                { type: 'text', text: formatDateShort(dueDate) },
+                { type: 'text', text: user.upiId || 'N/A' },
+              ],
+            },
+          ],
+        });
+        templateSent = true;
+        pdfSentViaTemplate = true;
+        logger.info('Invoice sent via invoice_with_pdf template', { invoiceNo, clientPhone });
+      } catch (pdfTemplateErr: any) {
+        logger.warn('invoice_with_pdf template failed', { error: pdfTemplateErr?.message });
+      }
+    }
+
+    // Fallback: try invoice_notification template (no PDF)
+    if (!templateSent) {
+      try {
+        await sendTemplateMessage({
+          to: clientPhone,
+          templateName: 'invoice_notification',
+          languageCode: 'en',
+          components: [
+            {
+              type: 'body',
+              parameters: [
+                { type: 'text', text: parsedInvoice.clientName },
+                { type: 'text', text: user.businessName },
+                { type: 'text', text: invoiceNo },
+                { type: 'text', text: formatCurrency(totalAmount) },
+                { type: 'text', text: formatDateShort(dueDate) },
+                { type: 'text', text: user.upiId || 'N/A' },
+              ],
+            },
+          ],
+        });
+        templateSent = true;
+        logger.info('Invoice sent via invoice_notification template', { invoiceNo, clientPhone });
+      } catch (templateErr: any) {
+        logger.warn('invoice_notification template failed, trying hello_world', { error: templateErr?.message });
+
+        // Fallback: hello_world
+        try {
+          await sendTemplateMessage({
+            to: clientPhone,
+            templateName: 'hello_world',
+            languageCode: 'en_US',
+          });
+          templateSent = true;
+        } catch (helloErr: any) {
+          logger.warn('hello_world template also failed', { error: helloErr?.message });
+        }
+      }
+    }
+
+    // Also send freeform text (works for production numbers or existing conversations)
+    try {
+      await sendTextMessage({ to: clientPhone, text: clientMsg });
+    } catch (textErr: any) {
+      if (!templateSent) throw textErr;
+      logger.warn('Freeform invoice text not delivered (test number limitation)', { error: textErr?.message });
+    }
+
+    // Send PDF separately if not already sent via template
+    if (pdfMediaId && !pdfSentViaTemplate) {
+      try {
         await sendMediaMessage({
           to: clientPhone,
           type: 'document',
-          mediaId,
+          mediaId: pdfMediaId,
           caption: `Invoice #${invoiceNo}`,
           filename: `${invoiceNo}.pdf`,
         });
