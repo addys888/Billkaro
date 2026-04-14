@@ -517,8 +517,8 @@ async function sendInvoiceToClient(
           {
             type: 'body',
             parameters: [
-              { type: 'text', text: user.businessName },
               { type: 'text', text: parsedInvoice.clientName },
+              { type: 'text', text: user.businessName },
               { type: 'text', text: invoiceNo },
               { type: 'text', text: formatCurrency(totalAmount) },
               { type: 'text', text: formatDateShort(dueDate) },

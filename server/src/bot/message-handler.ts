@@ -232,27 +232,23 @@ async function sendHelpMessage(phone: string): Promise<void> {
  */
 async function handleClientReply(clientPhone: string, text: string): Promise<boolean> {
   try {
-    // Find if this phone belongs to any known client with pending invoices
-    const client = await prisma.client.findFirst({
-      where: { phone: clientPhone },
-      include: {
-        invoices: {
-          where: {
-            status: { in: ['PENDING', 'PARTIALLY_PAID', 'OVERDUE'] },
-            sentToClient: true,
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          include: { user: true },
-        },
+    // Find the most recent pending invoice sent to this client phone
+    // Query invoices directly (not via client) to avoid matching wrong merchant's client
+    const invoice = await prisma.invoice.findFirst({
+      where: {
+        status: { in: ['PENDING', 'PARTIALLY_PAID', 'OVERDUE'] },
+        sentToClient: true,
+        client: { phone: clientPhone },
       },
+      orderBy: { updatedAt: 'desc' },
+      include: { user: true, client: true },
     });
 
-    if (!client || client.invoices.length === 0) {
+    if (!invoice) {
       return false; // Not a known client — let normal flow handle
     }
 
-    const invoice = client.invoices[0];
+    const client = invoice.client;
     const merchantPhone = invoice.user.phone;
     const totalAmount = Number(invoice.totalAmount);
     const amountPaid = Number(invoice.amountPaid || 0);
@@ -406,23 +402,19 @@ async function handleImageMessage(senderPhone: string, imageId: string, mimeType
       return;
     }
 
-    // Check if sender is a known client with pending invoices
-    const client = await prisma.client.findFirst({
-      where: { phone: senderPhone },
-      include: {
-        invoices: {
-          where: {
-            status: { in: ['PENDING', 'PARTIALLY_PAID', 'OVERDUE'] },
-            sentToClient: true,
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          include: { user: true },
-        },
+    // Find the most recent pending invoice sent to this client phone
+    // Query invoices directly (not via client) to avoid matching wrong merchant's client
+    const invoice = await prisma.invoice.findFirst({
+      where: {
+        status: { in: ['PENDING', 'PARTIALLY_PAID', 'OVERDUE'] },
+        sentToClient: true,
+        client: { phone: senderPhone },
       },
+      orderBy: { updatedAt: 'desc' },
+      include: { user: true, client: true },
     });
 
-    if (!client || client.invoices.length === 0) {
+    if (!invoice) {
       // Unknown sender — ignore image
       await sendTextMessage({
         to: senderPhone,
@@ -431,7 +423,7 @@ async function handleImageMessage(senderPhone: string, imageId: string, mimeType
       return;
     }
 
-    const invoice = client.invoices[0];
+    const client = invoice.client;
     const merchant = invoice.user;
     const totalAmount = Number(invoice.totalAmount);
     const amountPaid = Number(invoice.amountPaid || 0);
