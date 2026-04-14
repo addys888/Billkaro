@@ -502,7 +502,57 @@ async function sendInvoiceToClient(
 
     const clientMsg = msgParts.filter(Boolean).join('\n');
 
-    await sendTextMessage({ to: clientPhone, text: clientMsg });
+    // With Meta test numbers, ONLY template messages get delivered to new clients.
+    // Freeform text is accepted by the API but silently dropped.
+    // Strategy: try custom invoice template → fallback to hello_world → fallback to freeform
+    let templateSent = false;
+
+    // Try custom invoice_notification template (if approved)
+    try {
+      await sendTemplateMessage({
+        to: clientPhone,
+        templateName: 'invoice_notification',
+        languageCode: 'en',
+        components: [
+          {
+            type: 'body',
+            parameters: [
+              { type: 'text', text: user.businessName },
+              { type: 'text', text: parsedInvoice.clientName },
+              { type: 'text', text: invoiceNo },
+              { type: 'text', text: formatCurrency(totalAmount) },
+              { type: 'text', text: formatDateShort(dueDate) },
+              { type: 'text', text: user.upiId || 'N/A' },
+            ],
+          },
+        ],
+      });
+      templateSent = true;
+      logger.info('Invoice sent via invoice_notification template', { invoiceNo, clientPhone });
+    } catch (templateErr: any) {
+      logger.warn('invoice_notification template failed, trying hello_world', { error: templateErr?.message });
+
+      // Fallback: send hello_world template so client at least gets notified
+      try {
+        await sendTemplateMessage({
+          to: clientPhone,
+          templateName: 'hello_world',
+          languageCode: 'en_US',
+        });
+        templateSent = true;
+        logger.info('Invoice notification sent via hello_world fallback', { invoiceNo, clientPhone });
+      } catch (helloErr: any) {
+        logger.warn('hello_world template also failed', { error: helloErr?.message });
+      }
+    }
+
+    // Also send the full invoice text (works for production numbers or existing conversations)
+    try {
+      await sendTextMessage({ to: clientPhone, text: clientMsg });
+    } catch (textErr: any) {
+      if (!templateSent) throw textErr; // Re-throw only if no template was sent either
+      logger.warn('Freeform invoice text not delivered (test number limitation)', { error: textErr?.message });
+    }
 
     // Send PDF if available
     if (pdfUrl) {
