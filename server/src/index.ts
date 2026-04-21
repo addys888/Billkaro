@@ -7,6 +7,7 @@ import { config } from './config';
 import { logger } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { startReminderWorker } from './services/reminder.service';
+import { prisma } from './db/prisma';
 
 // Routes
 import webhookRoutes from './routes/webhook.routes';
@@ -55,6 +56,51 @@ app.get('/health', (_req, res) => {
     uptime: process.uptime(),
     environment: config.NODE_ENV,
   });
+});
+
+// ── One-time Seed Endpoint (remove after use) ─────────────
+app.post('/api/seed-merchant', async (req, res) => {
+  try {
+    const { phone, businessName, secret } = req.body;
+
+    // Simple secret protection
+    if (secret !== 'billkaro-seed-2026') {
+      res.status(403).json({ success: false, error: 'Invalid secret' });
+      return;
+    }
+
+    if (!phone) {
+      res.status(400).json({ success: false, error: 'Phone required' });
+      return;
+    }
+
+    let normalizedPhone = phone.replace(/\D/g, '');
+    if (!normalizedPhone.startsWith('91')) {
+      normalizedPhone = `91${normalizedPhone}`;
+    }
+
+    // Check if exists
+    const existing = await prisma.user.findUnique({ where: { phone: normalizedPhone } });
+    if (existing) {
+      res.json({ success: true, message: 'User already exists', userId: existing.id });
+      return;
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        phone: normalizedPhone,
+        businessName: businessName || 'My Business',
+        onboardingComplete: true,
+        subscriptionStatus: 'active',
+        subscriptionPlan: 'trial',
+        subscriptionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      },
+    });
+
+    res.json({ success: true, message: 'Merchant registered', userId: user.id });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // ── API Routes ────────────────────────────────────────────
