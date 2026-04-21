@@ -168,16 +168,17 @@ export default function AdminPage() {
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--color-border)' }}>
                 <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600 }}>Business</th>
-                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, width: '180px' }}>Plan / Status</th>
-                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, width: '150px' }}>Expiry</th>
+                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, width: '120px' }}>Setup</th>
+                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, width: '150px' }}>Plan / Status</th>
+                <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, width: '130px' }}>Expiry</th>
                 <th style={{ padding: '16px 24px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-text-muted)', fontWeight: 600, textAlign: 'right', width: '220px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={4} style={{ padding: '48px', textAlign: 'center' }}>Loading platform data...</td></tr>
+                <tr><td colSpan={5} style={{ padding: '48px', textAlign: 'center' }}>Loading platform data...</td></tr>
               ) : filteredUsers.length === 0 ? (
-                <tr><td colSpan={4} style={{ padding: '48px', textAlign: 'center' }}>No matching businesses found</td></tr>
+                <tr><td colSpan={5} style={{ padding: '48px', textAlign: 'center' }}>No matching businesses found</td></tr>
               ) : (
                 filteredUsers.map((u) => (
                   <tr key={u.id} className="hover-row" style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -191,6 +192,15 @@ export default function AdminPage() {
                           <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>+{u.phone}</div>
                         </div>
                       </div>
+                    </td>
+                    <td style={{ padding: '16px 24px' }}>
+                      {['919452661608', '919082573335'].includes(u.phone) ? (
+                        <span style={{ fontSize: '10px', fontWeight: 800, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>ADMIN</span>
+                      ) : !u.onboardingComplete ? (
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#f97316', background: 'rgba(249, 115, 22, 0.1)', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(249, 115, 22, 0.2)' }}>⏳ Pending Setup</span>
+                      ) : (
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#22c55e', background: 'rgba(34, 197, 94, 0.1)', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(34, 197, 94, 0.2)' }}>✅ Active</span>
+                      )}
                     </td>
                     <td style={{ padding: '16px 24px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>

@@ -58,6 +58,8 @@ router.get('/users', async (req: AuthRequest, res: Response) => {
         businessName: true,
         role: true,
         isSuspended: true,
+        onboardingComplete: true,
+        upiId: true,
         subscriptionPlan: true,
         subscriptionStatus: true,
         subscriptionExpiresAt: true,
