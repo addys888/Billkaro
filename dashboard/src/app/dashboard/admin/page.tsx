@@ -153,7 +153,7 @@ export default function AdminPage() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="form-input"
-              style={{ paddingLeft: '40px', height: '42px', fontSize: '14px', width: '100%', background: 'rgba(255,255,255,0.03)' }}
+              style={{ paddingLeft: '40px', height: '42px', fontSize: '14px', width: '100%', background: 'rgba(255,255,255,0.05)', color: '#E8E8F0', border: '1px solid rgba(255,255,255,0.1)' }}
               onClick={(e) => e.stopPropagation()}
             />
             <div style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', opacity: 0.4 }}>
@@ -326,14 +326,14 @@ export default function AdminPage() {
             <div style={{ marginBottom: '16px' }}>
               <label style={{ fontSize: '13px', fontWeight: 600, marginBottom: '6px', display: 'block', color: 'var(--color-text-muted)' }}>WhatsApp Number *</label>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <input className="form-input" value="+91" disabled style={{ width: '60px', textAlign: 'center', background: 'rgba(255,255,255,0.03)' }} />
+                <input className="form-input" value="+91" disabled style={{ width: '60px', textAlign: 'center', background: 'rgba(255,255,255,0.05)', color: '#E8E8F0', border: '1px solid rgba(255,255,255,0.1)' }} />
                 <input
                   className="form-input"
                   type="tel"
                   placeholder="10-digit number"
                   value={newClientPhone}
                   onChange={(e) => setNewClientPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  style={{ flex: 1, background: 'rgba(255,255,255,0.03)' }}
+                  style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: '#E8E8F0', border: '1px solid rgba(255,255,255,0.1)' }}
                   autoFocus
                   onClick={(e) => e.stopPropagation()}
                 />
@@ -348,7 +348,7 @@ export default function AdminPage() {
                 placeholder="e.g. Soni Designs"
                 value={newClientName}
                 onChange={(e) => setNewClientName(e.target.value)}
-                style={{ width: '100%', background: 'rgba(255,255,255,0.03)' }}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#E8E8F0', border: '1px solid rgba(255,255,255,0.1)' }}
                 onClick={(e) => e.stopPropagation()}
               />
             </div>
