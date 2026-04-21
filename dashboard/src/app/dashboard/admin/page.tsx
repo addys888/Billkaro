@@ -152,8 +152,8 @@ export default function AdminPage() {
               placeholder="Search by name or phone..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="form-input"
-              style={{ paddingLeft: '40px', height: '42px', fontSize: '14px', width: '100%', background: 'rgba(255,255,255,0.05)', color: '#E8E8F0', border: '1px solid rgba(255,255,255,0.1)' }}
+              className="admin-input"
+              style={{ paddingLeft: '40px', height: '42px', width: '100%' }}
               onClick={(e) => e.stopPropagation()}
             />
             <div style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', opacity: 0.4 }}>
@@ -326,14 +326,14 @@ export default function AdminPage() {
             <div style={{ marginBottom: '16px' }}>
               <label style={{ fontSize: '13px', fontWeight: 600, marginBottom: '6px', display: 'block', color: 'var(--color-text-muted)' }}>WhatsApp Number *</label>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <input className="form-input" value="+91" disabled style={{ width: '60px', textAlign: 'center', background: 'rgba(255,255,255,0.05)', color: '#E8E8F0', border: '1px solid rgba(255,255,255,0.1)' }} />
+                <input className="admin-input" value="+91" disabled style={{ width: '60px', textAlign: 'center', opacity: 0.6 }} />
                 <input
-                  className="form-input"
+                  className="admin-input"
                   type="tel"
                   placeholder="10-digit number"
                   value={newClientPhone}
                   onChange={(e) => setNewClientPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: '#E8E8F0', border: '1px solid rgba(255,255,255,0.1)' }}
+                  style={{ flex: 1 }}
                   autoFocus
                   onClick={(e) => e.stopPropagation()}
                 />
@@ -343,12 +343,12 @@ export default function AdminPage() {
             <div style={{ marginBottom: '24px' }}>
               <label style={{ fontSize: '13px', fontWeight: 600, marginBottom: '6px', display: 'block', color: 'var(--color-text-muted)' }}>Business Name (optional)</label>
               <input
-                className="form-input"
+                className="admin-input"
                 type="text"
                 placeholder="e.g. Soni Designs"
                 value={newClientName}
                 onChange={(e) => setNewClientName(e.target.value)}
-                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: '#E8E8F0', border: '1px solid rgba(255,255,255,0.1)' }}
+                style={{ width: '100%' }}
                 onClick={(e) => e.stopPropagation()}
               />
             </div>
@@ -391,6 +391,24 @@ export default function AdminPage() {
         .dropdown-menu button:hover { background: rgba(37, 211, 102, 0.15); color: #25D366; }
         .btn-danger { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
         .btn-danger:hover { background: #ef4444; color: white; }
+        .admin-input {
+          padding: 10px 14px;
+          border-radius: 10px;
+          font-size: 14px;
+          font-family: inherit;
+          outline: none;
+          background: rgba(255, 255, 255, 0.06) !important;
+          color: #FFFFFF !important;
+          border: 1px solid rgba(255, 255, 255, 0.15) !important;
+          transition: border-color 0.2s;
+        }
+        .admin-input::placeholder {
+          color: rgba(255, 255, 255, 0.35);
+        }
+        .admin-input:focus {
+          border-color: #25D366 !important;
+          box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.15);
+        }
       `}</style>
     </div>
   );
