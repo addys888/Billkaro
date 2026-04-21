@@ -89,9 +89,9 @@ export async function verifyOTP(
   let user = await prisma.user.findUnique({ where: { phone } });
 
   if (!user) {
-    // Create new user with 14-day trial
+    // Create new user with 7-day free trial
     const trialExpiry = new Date();
-    trialExpiry.setDate(trialExpiry.getDate() + 14);
+    trialExpiry.setDate(trialExpiry.getDate() + 7);
 
     user = await prisma.user.create({
       data: {

@@ -157,7 +157,7 @@ router.post('/users', async (req: AuthRequest, res: Response) => {
 
     // Create pre-approved user (onboarding not complete — bot will guide them)
     const trialExpiry = new Date();
-    trialExpiry.setDate(trialExpiry.getDate() + 14);
+    trialExpiry.setDate(trialExpiry.getDate() + 7);
 
     const user = await prisma.user.create({
       data: {
