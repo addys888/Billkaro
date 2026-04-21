@@ -169,6 +169,39 @@ export default function LoginPage() {
             </div>
           </form>
         )}
+
+        <div style={{
+          marginTop: '24px',
+          paddingTop: '20px',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          textAlign: 'center',
+        }}>
+          <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '10px' }}>
+            New to BillKaro?
+          </p>
+          <a
+            href="https://wa.me/918887360053?text=Hi%2C%20I%20want%20to%20start%20using%20BillKaro"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: 'rgba(37, 211, 102, 0.1)',
+              color: '#25D366',
+              padding: '10px 20px',
+              borderRadius: '10px',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              textDecoration: 'none',
+              border: '1px solid rgba(37, 211, 102, 0.2)',
+              transition: 'all 0.2s',
+            }}
+            id="whatsapp-signup-btn"
+          >
+            💬 Message us on WhatsApp to get started
+          </a>
+        </div>
       </div>
     </div>
   );
