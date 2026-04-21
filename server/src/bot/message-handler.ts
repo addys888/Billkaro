@@ -102,9 +102,27 @@ export async function handleIncomingMessage(message: any, senderPhone: string): 
     if (!user) {
       const isClientReply = await handleClientReply(senderPhone, text);
       if (isClientReply) return;
+
+      // ── AUTHORIZATION GATE ──
+      // Unknown number that isn't a client reply → block access
+      await sendTextMessage({
+        to: senderPhone,
+        text: [
+          '🔒 *Access Restricted*',
+          '',
+          'BillKaro is an invite-only platform.',
+          '',
+          'To get started, please contact the CelerApps team:',
+          '📧 hello@celerapps.com',
+          '🌐 www.celerapps.com',
+          '',
+          '_Once approved, you\'ll be able to create invoices instantly via WhatsApp!_',
+        ].join('\n'),
+      });
+      return;
     }
 
-    if (!user || !user.onboardingComplete) {
+    if (!user.onboardingComplete) {
       await handleOnboardingStep(senderPhone, text, user);
       return;
     }

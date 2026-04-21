@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
-import { ShieldCheck, Calendar, Phone, TrendingUp, Users, FileText, Activity, Search } from 'lucide-react';
+import { ShieldCheck, Calendar, Phone, TrendingUp, Users, FileText, Activity, Search, UserPlus } from 'lucide-react';
 import { formatDate, formatCurrency, formatNumber } from '@/lib/utils';
 
 export default function AdminPage() {
@@ -12,6 +12,11 @@ export default function AdminPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [updating, setUpdating] = useState<string | null>(null);
   const [showModal, setShowModal] = useState<{ type: string; user: any; val?: any } | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newClientPhone, setNewClientPhone] = useState('');
+  const [newClientName, setNewClientName] = useState('');
+  const [addingClient, setAddingClient] = useState(false);
+  const [addError, setAddError] = useState('');
 
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
@@ -49,6 +54,29 @@ export default function AdminPage() {
       console.error('Action failed', error);
     } finally {
       setUpdating(null);
+    }
+  };
+
+  const handleAddClient = async () => {
+    if (!newClientPhone || newClientPhone.length < 10) {
+      setAddError('Please enter a valid 10-digit phone number');
+      return;
+    }
+    setAddingClient(true);
+    setAddError('');
+    try {
+      await apiFetch('/api/admin/users', {
+        method: 'POST',
+        body: JSON.stringify({ phone: newClientPhone, businessName: newClientName }),
+      });
+      setShowAddModal(false);
+      setNewClientPhone('');
+      setNewClientName('');
+      await fetchData();
+    } catch (err: any) {
+      setAddError(err.message || 'Failed to add client');
+    } finally {
+      setAddingClient(false);
     }
   };
 
@@ -110,6 +138,14 @@ export default function AdminPage() {
       <div className="glass-card" style={{ padding: '0', overflow: 'hidden' }}>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
           <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Business Management</h3>
+          <div style={{ display: 'flex', gap: '12px', flex: '1', maxWidth: '520px', alignItems: 'center' }}>
+            <button
+              className="btn btn-primary btn-sm"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', whiteSpace: 'nowrap', fontSize: '13px', fontWeight: 600 }}
+              onClick={(e) => { e.stopPropagation(); setShowAddModal(true); setAddError(''); }}
+            >
+              <UserPlus size={16} /> Add Client
+            </button>
           <div style={{ position: 'relative', flex: '1', maxWidth: '360px' }}>
             <input 
               type="text" 
@@ -123,6 +159,7 @@ export default function AdminPage() {
             <div style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', opacity: 0.4 }}>
               <Search size={18} />
             </div>
+          </div>
           </div>
         </div>
 
@@ -254,6 +291,66 @@ export default function AdminPage() {
                 }}
               >
                 {updating ? 'Processing...' : 'Confirm Action'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Client Modal */}
+      {showAddModal && (
+        <div className="modal-overlay">
+          <div className="glass-card modal-content" style={{ maxWidth: '420px', width: '90%', padding: '32px' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px', textAlign: 'center' }}>👤</div>
+            <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '8px', textAlign: 'center' }}>Add New Client</h2>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginBottom: '24px', textAlign: 'center' }}>
+              Pre-register a merchant. They can then message the bot to complete onboarding.
+            </p>
+
+            {addError && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                {addError}
+              </div>
+            )}
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 600, marginBottom: '6px', display: 'block', color: 'var(--color-text-muted)' }}>WhatsApp Number *</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input className="form-input" value="+91" disabled style={{ width: '60px', textAlign: 'center', background: 'rgba(255,255,255,0.03)' }} />
+                <input
+                  className="form-input"
+                  type="tel"
+                  placeholder="10-digit number"
+                  value={newClientPhone}
+                  onChange={(e) => setNewClientPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  style={{ flex: 1, background: 'rgba(255,255,255,0.03)' }}
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 600, marginBottom: '6px', display: 'block', color: 'var(--color-text-muted)' }}>Business Name (optional)</label>
+              <input
+                className="form-input"
+                type="text"
+                placeholder="e.g. Soni Designs"
+                value={newClientName}
+                onChange={(e) => setNewClientName(e.target.value)}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.03)' }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button className="btn btn-outline" onClick={() => { setShowAddModal(false); setAddError(''); }}>Cancel</button>
+              <button
+                className="btn btn-primary"
+                disabled={addingClient}
+                onClick={handleAddClient}
+              >
+                {addingClient ? 'Adding...' : '✅ Add Client'}
               </button>
             </div>
           </div>

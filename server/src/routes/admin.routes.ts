@@ -126,4 +126,59 @@ router.patch('/users/:id/subscription', async (req: AuthRequest, res: Response) 
   }
 });
 
+/**
+ * [POST] Pre-register a new merchant (whitelist for bot access)
+ * Creates a minimal user record; merchant completes onboarding via WhatsApp
+ */
+router.post('/users', async (req: AuthRequest, res: Response) => {
+  try {
+    const { phone, businessName } = req.body;
+
+    if (!phone) {
+      res.status(400).json({ success: false, error: 'Phone number is required' });
+      return;
+    }
+
+    let normalizedPhone = phone.replace(/\D/g, '');
+    if (normalizedPhone.startsWith('9191')) {
+      normalizedPhone = normalizedPhone.substring(2);
+    } else if (!normalizedPhone.startsWith('91')) {
+      normalizedPhone = `91${normalizedPhone}`;
+    }
+
+    // Check if already exists
+    const existing = await prisma.user.findUnique({ where: { phone: normalizedPhone } });
+    if (existing) {
+      res.status(409).json({ success: false, error: 'This phone number is already registered' });
+      return;
+    }
+
+    // Create pre-approved user (onboarding not complete — bot will guide them)
+    const trialExpiry = new Date();
+    trialExpiry.setDate(trialExpiry.getDate() + 14);
+
+    const user = await prisma.user.create({
+      data: {
+        phone: normalizedPhone,
+        businessName: businessName || 'New Business',
+        onboardingComplete: false,
+        subscriptionPlan: 'Trial',
+        subscriptionStatus: 'active',
+        subscriptionExpiresAt: trialExpiry,
+      },
+    });
+
+    logger.info('Admin pre-registered merchant', { phone: normalizedPhone, adminPhone: req.user?.phone });
+
+    res.json({
+      success: true,
+      message: `Merchant ${normalizedPhone} pre-registered. They can now message the bot to complete onboarding.`,
+      user: { id: user.id, phone: user.phone, businessName: user.businessName },
+    });
+  } catch (error) {
+    logger.error('Admin add user error', { error });
+    res.status(500).json({ success: false, error: 'Failed to register merchant' });
+  }
+});
+
 export default router;
