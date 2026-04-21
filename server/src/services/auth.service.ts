@@ -23,9 +23,18 @@ export async function sendOTP(phone: string): Promise<void> {
     data: { phone, code, expiresAt },
   });
 
+  // Get the bot's own phone number (can't send WhatsApp to itself)
+  const botPhone = config.WHATSAPP_PHONE_NUMBER_ID ? `91${process.env.BOT_PHONE || '8887360053'}` : '';
+
+  if (phone === botPhone || phone === '918887360053') {
+    // Bot's own number — can't send WhatsApp to itself
+    // OTP is saved in DB, log it server-side for manual use
+    logger.info(`🔐 OTP for bot number ${phone}: ${code} (WhatsApp delivery skipped — bot can't message itself)`);
+    return;
+  }
+
   if (config.NODE_ENV === 'production') {
     // Send OTP via WhatsApp text message
-    // TODO: Switch to sendTemplateMessage('otp_login') once Meta approves the template
     await sendTextMessage({
       to: phone,
       text: `🔐 Your BillKaro login OTP is: *${code}*\n\nValid for 10 minutes. Do not share with anyone.`,
