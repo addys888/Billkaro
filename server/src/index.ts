@@ -7,6 +7,7 @@ import { config } from './config';
 import { logger } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { startReminderWorker } from './services/reminder.service';
+import { cleanupExpiredOTPs } from './services/auth.service';
 
 // Routes
 import webhookRoutes from './routes/webhook.routes';
@@ -84,6 +85,16 @@ app.listen(PORT, () => {
   } catch (error) {
     logger.warn('⚠️ Reminder worker failed to start (Redis may not be available)', { error });
   }
+
+  // Clean up expired OTPs every hour
+  setInterval(async () => {
+    try {
+      await cleanupExpiredOTPs();
+      logger.debug('🧹 Expired OTPs cleaned up');
+    } catch (err) {
+      logger.warn('OTP cleanup failed', { error: err });
+    }
+  }, 60 * 60 * 1000); // 1 hour
 });
 
 export default app;

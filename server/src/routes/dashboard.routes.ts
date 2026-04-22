@@ -55,6 +55,8 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
 
     for (const inv of invoices) {
       const amount = Number(inv.totalAmount);
+      const amountPaid = Number(inv.amountPaid || 0);
+      const balanceDue = amount - amountPaid;
       totalInvoiced += amount;
 
       if (inv.status === InvoiceStatus.PAID) {
@@ -68,40 +70,56 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
           paidWithDays++;
         }
       } else if (inv.status === 'PARTIALLY_PAID') {
-        const paid = Number((inv as any).amountPaid || 0);
-        totalCollected += paid;
-        totalPending += (amount - paid);
-        pendingCount++;
-      } else if (inv.status === InvoiceStatus.OVERDUE) {
-        totalOverdue += amount;
-        overdueCount++;
-        overdueInvoices.push({
-          id: inv.id,
-          invoiceNo: inv.invoiceNo,
-          clientName: inv.client.name,
-          totalAmount: amount,
-          amountPaid: Number((inv as any).amountPaid || 0),
-          daysOverdue: Math.floor(
-            (now.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24)
-          ),
-        });
-      } else if (inv.status === InvoiceStatus.PENDING) {
-        totalPending += amount;
-        pendingCount++;
-        // Check if actually overdue
+        totalCollected += amountPaid;
+        // Partially paid: check if also overdue
         if (new Date(inv.dueDate) < now) {
-          totalOverdue += amount;
+          totalOverdue += balanceDue;
           overdueCount++;
           overdueInvoices.push({
             id: inv.id,
             invoiceNo: inv.invoiceNo,
             clientName: inv.client.name,
             totalAmount: amount,
-            amountPaid: Number((inv as any).amountPaid || 0),
+            amountPaid,
             daysOverdue: Math.floor(
               (now.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24)
             ),
           });
+        } else {
+          totalPending += balanceDue;
+          pendingCount++;
+        }
+      } else if (inv.status === InvoiceStatus.OVERDUE) {
+        totalOverdue += balanceDue;
+        overdueCount++;
+        overdueInvoices.push({
+          id: inv.id,
+          invoiceNo: inv.invoiceNo,
+          clientName: inv.client.name,
+          totalAmount: amount,
+          amountPaid,
+          daysOverdue: Math.floor(
+            (now.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24)
+          ),
+        });
+      } else if (inv.status === InvoiceStatus.PENDING) {
+        // Check if actually overdue (date passed but status not updated)
+        if (new Date(inv.dueDate) < now) {
+          totalOverdue += balanceDue;
+          overdueCount++;
+          overdueInvoices.push({
+            id: inv.id,
+            invoiceNo: inv.invoiceNo,
+            clientName: inv.client.name,
+            totalAmount: amount,
+            amountPaid,
+            daysOverdue: Math.floor(
+              (now.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24)
+            ),
+          });
+        } else {
+          totalPending += balanceDue;
+          pendingCount++;
         }
       }
     }
@@ -120,7 +138,7 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
     res.json({
       totalInvoiced,
       totalCollected,
-      totalPending: totalPending + totalOverdue - totalOverdue, // Pending = not yet due
+      totalPending,
       totalOverdue,
       invoiceCount: invoices.length,
       paidCount,
@@ -140,32 +158,59 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
 router.get('/trends', async (req: AuthRequest, res: Response) => {
   try {
     const monthCount = parseInt((req.query.months as string) || '6', 10);
-    const months: Array<{ month: string; invoiced: number; collected: number }> = [];
+    const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth() - monthCount + 1, 1);
 
+    // Single query for all months instead of N+1
+    const invoices = await prisma.invoice.findMany({
+      where: {
+        userId: req.userId,
+        createdAt: { gte: startDate },
+      },
+      select: {
+        totalAmount: true,
+        amountPaid: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    // Group by month locally
+    const monthMap = new Map<string, { invoiced: number; collected: number }>();
+
+    // Pre-fill all months so there are no gaps
     for (let i = monthCount - 1; i >= 0; i--) {
-      const now = new Date();
-      const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
-
-      const invoices = await prisma.invoice.findMany({
-        where: {
-          userId: req.userId,
-          createdAt: { gte: start, lte: end },
-        },
-      });
-
-      let invoiced = 0;
-      let collected = 0;
-      for (const inv of invoices) {
-        invoiced += Number(inv.totalAmount);
-        if (inv.status === InvoiceStatus.PAID) {
-          collected += Number(inv.totalAmount);
-        }
-      }
-
-      const monthName = start.toLocaleString('en-US', { month: 'short', year: 'numeric' });
-      months.push({ month: monthName, invoiced, collected });
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+      monthMap.set(key, { invoiced: 0, collected: 0 });
     }
+
+    for (const inv of invoices) {
+      const d = new Date(inv.createdAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+      const bucket = monthMap.get(key);
+      if (!bucket) continue;
+
+      bucket.invoiced += Number(inv.totalAmount);
+
+      if (inv.status === InvoiceStatus.PAID) {
+        bucket.collected += Number(inv.totalAmount);
+      } else if (inv.status === 'PARTIALLY_PAID') {
+        // Include partial payments in collected amount
+        bucket.collected += Number(inv.amountPaid || 0);
+      }
+    }
+
+    // Convert map to sorted array
+    const months = Array.from(monthMap.entries()).map(([key, data]) => {
+      const [year, month] = key.split('-').map(Number);
+      const d = new Date(year, month, 1);
+      return {
+        month: d.toLocaleString('en-US', { month: 'short', year: 'numeric' }),
+        invoiced: data.invoiced,
+        collected: data.collected,
+      };
+    });
 
     res.json({ months });
   } catch (error) {

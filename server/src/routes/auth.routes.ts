@@ -121,8 +121,8 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
       const diffTime = expires.getTime() - now.getTime();
       daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
     } else {
-      // If no expiry is set, default to 14 days (trial)
-      daysRemaining = 14; 
+      // If no expiry is set, default to 7 days (matches trial period)
+      daysRemaining = 7; 
     }
 
 
@@ -165,14 +165,14 @@ router.patch('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
     // businessName is intentionally excluded — it's set during onboarding only
     const { upiId, address, bankAccountNo, bankIfsc, bankAccountName, defaultPaymentTermsDays } = req.body;
 
-    // Validate payment terms if provided
-    const updateData: any = {
-      upiId,
-      businessAddress: address,
-      bankAccountNo,
-      bankIfsc,
-      bankAccountName,
-    };
+    // Only include fields that are explicitly provided (not undefined)
+    // This prevents accidentally wiping data when frontend only sends partial updates
+    const updateData: any = {};
+    if (upiId !== undefined) updateData.upiId = upiId;
+    if (address !== undefined) updateData.businessAddress = address;
+    if (bankAccountNo !== undefined) updateData.bankAccountNo = bankAccountNo;
+    if (bankIfsc !== undefined) updateData.bankIfsc = bankIfsc;
+    if (bankAccountName !== undefined) updateData.bankAccountName = bankAccountName;
 
     if (defaultPaymentTermsDays !== undefined) {
       const days = parseInt(defaultPaymentTermsDays, 10);
