@@ -19,8 +19,8 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
     today.setHours(0, 0, 0, 0);
 
     const [totalUsers, activeUsers, totalInvoices, dailyInvoices, revenue] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.count({ where: { subscriptionStatus: 'active', isSuspended: false } }),
+      prisma.user.count({ where: { role: { not: 'super_admin' } } }),
+      prisma.user.count({ where: { role: { not: 'super_admin' }, subscriptionStatus: 'active', isSuspended: false } }),
       prisma.invoice.count(),
       prisma.invoice.count({ where: { createdAt: { gte: today } } }),
       prisma.invoice.aggregate({
@@ -56,15 +56,17 @@ router.get('/users', async (req: AuthRequest, res: Response) => {
     const search = (req.query.search as string || '').trim();
     const skip = (page - 1) * limit;
 
-    // Build search filter
+    // Build search filter — exclude super_admin accounts (system accounts)
+    const baseFilter = { role: { not: 'super_admin' } };
     const where = search
       ? {
+          ...baseFilter,
           OR: [
             { phone: { contains: search } },
             { businessName: { contains: search, mode: 'insensitive' as const } },
           ],
         }
-      : {};
+      : baseFilter;
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
@@ -156,6 +158,41 @@ router.patch('/users/:id/subscription', async (req: AuthRequest, res: Response) 
   } catch (error) {
     logger.error('Admin subscription update error', { error });
     res.status(500).json({ success: false, error: 'Failed to update subscription' });
+  }
+});
+
+/**
+ * [PATCH] Update user profile (business name, etc.)
+ */
+router.patch('/users/:id/profile', async (req: AuthRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { businessName } = req.body;
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      res.status(404).json({ success: false, error: 'User not found' });
+      return;
+    }
+
+    const updateData: any = {};
+    if (businessName) updateData.businessName = businessName;
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data: updateData,
+    });
+
+    logger.info('Admin updated user profile', { userId: id, changes: updateData, adminPhone: req.user?.phone });
+
+    res.json({
+      success: true,
+      message: 'User profile updated',
+      user: { id: updated.id, phone: updated.phone, businessName: updated.businessName },
+    });
+  } catch (error) {
+    logger.error('Admin profile update error', { error });
+    res.status(500).json({ success: false, error: 'Failed to update profile' });
   }
 });
 
