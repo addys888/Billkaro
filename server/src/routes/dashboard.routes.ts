@@ -38,7 +38,7 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
         createdAt: { gte: startDate },
       },
       include: {
-        client: { select: { name: true } },
+        client: { select: { name: true, phone: true } },
       },
     });
 
@@ -79,6 +79,8 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
             id: inv.id,
             invoiceNo: inv.invoiceNo,
             clientName: inv.client.name,
+            clientPhone: inv.client.phone || null,
+            description: inv.description || '',
             totalAmount: amount,
             amountPaid,
             daysOverdue: Math.floor(
@@ -146,7 +148,7 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
       overdueCount,
       collectionRate,
       avgDaysToPay,
-      overdueInvoices: overdueInvoices.slice(0, 10),
+      overdueInvoices, // All overdue — no limit
     });
   } catch (error) {
     logger.error('Dashboard overview error', { error });

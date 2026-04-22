@@ -20,6 +20,8 @@ interface OverviewData {
     id: string;
     invoiceNo: string;
     clientName: string;
+    clientPhone: string | null;
+    description: string;
     totalAmount: number;
     amountPaid: number;
     daysOverdue: number;
@@ -198,21 +200,24 @@ export default function DashboardPage() {
               </span>
             )}
           </div>
-          {overview.overdueInvoices.length > 0 && (
-            <button
-              onClick={() => { overview.overdueInvoices.forEach(inv => handleSendReminder(inv.id, inv.invoiceNo)); }}
-              disabled={actionLoading !== null}
-              style={{
-                background: 'linear-gradient(135deg, #f0883e, #f85149)',
-                color: '#fff', border: 'none', borderRadius: '8px',
-                padding: '8px 16px', fontSize: '12px', fontWeight: 600,
-                cursor: 'pointer', opacity: actionLoading ? 0.6 : 1,
-                transition: 'all 0.2s ease',
-              }}
-            >
-              📢 Remind All ({overview.overdueInvoices.length})
-            </button>
-          )}
+          {overview.overdueInvoices.length > 0 && (() => {
+            const remindable = overview.overdueInvoices.filter(inv => inv.clientPhone);
+            return remindable.length > 0 ? (
+              <button
+                onClick={() => { remindable.forEach(inv => handleSendReminder(inv.id, inv.invoiceNo)); }}
+                disabled={actionLoading !== null}
+                style={{
+                  background: 'linear-gradient(135deg, #f0883e, #f85149)',
+                  color: '#fff', border: 'none', borderRadius: '8px',
+                  padding: '8px 16px', fontSize: '12px', fontWeight: 600,
+                  cursor: 'pointer', opacity: actionLoading ? 0.6 : 1,
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                📢 Remind All ({remindable.length})
+              </button>
+            ) : null;
+          })()}
         </div>
 
         {overview.overdueInvoices.length === 0 ? (
@@ -227,7 +232,8 @@ export default function DashboardPage() {
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
                   <th style={{ padding: '12px', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Client</th>
-                  <th style={{ padding: '12px', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Invoice</th>
+                  <th style={{ padding: '12px', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Phone</th>
+                  <th style={{ padding: '12px', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Item</th>
                   <th style={{ padding: '12px', textAlign: 'right', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Total</th>
                   <th style={{ padding: '12px', textAlign: 'right', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Balance Due</th>
                   <th style={{ padding: '12px', textAlign: 'center', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Overdue</th>
@@ -240,6 +246,7 @@ export default function DashboardPage() {
                   const severity = inv.daysOverdue > 14 ? 'critical' : inv.daysOverdue > 7 ? 'warning' : 'mild';
                   const severityColor = severity === 'critical' ? '#f85149' : severity === 'warning' ? '#f0883e' : '#d29922';
                   const severityBg = severity === 'critical' ? 'rgba(248,81,73,0.1)' : severity === 'warning' ? 'rgba(240,136,62,0.1)' : 'rgba(210,153,34,0.1)';
+                  const hasPhone = !!inv.clientPhone;
                   
                   return (
                     <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border-light)', transition: 'background 0.2s' }}
@@ -251,10 +258,23 @@ export default function DashboardPage() {
                         {inv.clientName}
                       </td>
                       
-                      {/* Invoice Number */}
+                      {/* Client Phone */}
                       <td style={{ padding: '14px 12px' }}>
-                        <span style={{ color: 'var(--color-text-secondary)', fontSize: '12px', fontFamily: 'monospace' }}>
-                          {inv.invoiceNo}
+                        {hasPhone ? (
+                          <span style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>
+                            {inv.clientPhone!.startsWith('91') ? '+' + inv.clientPhone!.slice(0, 2) + ' ' + inv.clientPhone!.slice(2) : inv.clientPhone}
+                          </span>
+                        ) : (
+                          <span style={{ color: '#f85149', fontSize: '11px', fontStyle: 'italic' }}>No phone</span>
+                        )}
+                      </td>
+                      
+                      {/* Description / Item */}
+                      <td style={{ padding: '14px 12px', maxWidth: '160px' }}>
+                        <span style={{ color: 'var(--color-text-secondary)', fontSize: '12px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}
+                          title={inv.description}
+                        >
+                          {inv.description || '—'}
                         </span>
                       </td>
                       
@@ -286,15 +306,17 @@ export default function DashboardPage() {
                       {/* Action Buttons */}
                       <td style={{ padding: '14px 12px', textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                          {/* Send Reminder */}
+                          {/* Send Reminder — only enabled if client has phone */}
                           <button
                             onClick={() => handleSendReminder(inv.id, inv.invoiceNo)}
-                            disabled={actionLoading === `remind-${inv.id}`}
-                            title="Send WhatsApp Reminder"
+                            disabled={!hasPhone || actionLoading === `remind-${inv.id}`}
+                            title={hasPhone ? 'Send WhatsApp Reminder' : 'No phone number — add phone in Clients page'}
                             style={{
-                              background: 'rgba(240, 136, 62, 0.1)', border: '1px solid rgba(240, 136, 62, 0.3)',
-                              color: '#f0883e', borderRadius: '6px', padding: '6px 10px',
-                              fontSize: '12px', cursor: 'pointer', fontWeight: 500,
+                              background: hasPhone ? 'rgba(240, 136, 62, 0.1)' : 'rgba(128,128,128,0.1)',
+                              border: `1px solid ${hasPhone ? 'rgba(240, 136, 62, 0.3)' : 'rgba(128,128,128,0.2)'}`,
+                              color: hasPhone ? '#f0883e' : '#555',
+                              borderRadius: '6px', padding: '6px 10px',
+                              fontSize: '12px', cursor: hasPhone ? 'pointer' : 'not-allowed', fontWeight: 500,
                               opacity: actionLoading === `remind-${inv.id}` ? 0.5 : 1,
                               transition: 'all 0.2s',
                               whiteSpace: 'nowrap',
