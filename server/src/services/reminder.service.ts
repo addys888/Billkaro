@@ -147,6 +147,11 @@ export async function pauseClientReminders(userId: string, clientId: string): Pr
  * Start the reminder worker to process scheduled reminders
  */
 export function startReminderWorker(): void {
+  if (!connection) {
+    logger.warn('Reminder worker not started — no Redis connection');
+    return;
+  }
+
   const worker = new Worker(
     'reminders',
     async (job: Job) => {
