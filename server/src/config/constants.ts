@@ -1,6 +1,6 @@
 // ── Super Admin Phone Numbers ───────────────────────────────
 // Centralized list — update here to add/remove admins everywhere
-export const SUPER_ADMINS = ['919452661608', '919082573335'] as const;
+export const SUPER_ADMINS: readonly string[] = ['919452661608', '919082573335'];
 
 // ── Invoice Constants ───────────────────────────────────────
 export const INVOICE_PREFIX = 'BK';
