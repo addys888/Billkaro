@@ -21,6 +21,7 @@ interface OverviewData {
     invoiceNo: string;
     clientName: string;
     totalAmount: number;
+    amountPaid: number;
     daysOverdue: number;
   }>;
 }
@@ -33,6 +34,8 @@ export default function DashboardPage() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [trends, setTrends] = useState<TrendData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Default color palette for charts matching sleek UI
   const COLORS = ['#2ea043', '#f0883e', '#f85149'];
@@ -40,6 +43,14 @@ export default function DashboardPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Auto-hide toast after 3 seconds
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   const loadData = async () => {
     setLoading(true);
@@ -57,6 +68,35 @@ export default function DashboardPage() {
     }
   };
 
+  const handleSendReminder = async (invoiceId: string, invoiceNo: string) => {
+    setActionLoading(`remind-${invoiceId}`);
+    try {
+      await apiFetch(`/api/invoices/${invoiceId}/resend`, { method: 'POST' });
+      setToast({ message: `✅ Reminder sent for #${invoiceNo}`, type: 'success' });
+    } catch (err: any) {
+      setToast({ message: err.message || 'Failed to send reminder', type: 'error' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleMarkPaid = async (invoiceId: string, invoiceNo: string) => {
+    if (!confirm(`Mark invoice #${invoiceNo} as fully paid?`)) return;
+    setActionLoading(`paid-${invoiceId}`);
+    try {
+      await apiFetch(`/api/invoices/${invoiceId}/mark-paid`, {
+        method: 'PATCH',
+        body: JSON.stringify({ paymentMethod: 'manual' }),
+      });
+      setToast({ message: `✅ #${invoiceNo} marked as paid!`, type: 'success' });
+      loadData(); // Refresh data
+    } catch (err: any) {
+      setToast({ message: err.message || 'Failed to mark as paid', type: 'error' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   if (loading || !overview) {
     return (
       <div style={{ padding: '24px' }}>
@@ -68,15 +108,31 @@ export default function DashboardPage() {
     );
   }
 
-  // Mock data for Aging Chart based on pending/overdue to simulate donut
+  // Aging Chart data based on real overdue data
   const agingData = [
-    { name: 'Current', value: overview.totalPending - overview.totalOverdue > 0 ? overview.totalPending - overview.totalOverdue : 100 },
-    { name: '30d', value: (overview.totalOverdue / 2) || 30 },
-    { name: '60d+', value: (overview.totalOverdue / 2) || 10 },
+    { name: 'Current', value: Math.max(overview.totalPending - overview.totalOverdue, 0) || 0 },
+    { name: '1-30d', value: overview.overdueInvoices.filter(i => i.daysOverdue <= 30).reduce((sum, i) => sum + (i.totalAmount - i.amountPaid), 0) || 0 },
+    { name: '30d+', value: overview.overdueInvoices.filter(i => i.daysOverdue > 30).reduce((sum, i) => sum + (i.totalAmount - i.amountPaid), 0) || 0 },
   ];
+  const agingTotal = agingData.reduce((s, d) => s + d.value, 0) || 1;
 
   return (
     <div>
+      {/* Toast notification */}
+      {toast && (
+        <div style={{
+          position: 'fixed', top: '20px', right: '20px', zIndex: 9999,
+          padding: '14px 24px', borderRadius: '10px',
+          background: toast.type === 'success' ? 'rgba(46, 160, 67, 0.95)' : 'rgba(248, 81, 73, 0.95)',
+          color: '#fff', fontSize: '14px', fontWeight: 500,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+          animation: 'slideIn 0.3s ease-out',
+          backdropFilter: 'blur(8px)',
+        }}>
+          {toast.message}
+        </div>
+      )}
+
       <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--color-text)', marginBottom: '24px' }}>
         Financial Overview
       </h2>
@@ -123,38 +179,154 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Overdue Invoices Table */}
+      {/* ── Enhanced Overdue / Action Center ── */}
       <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px', marginBottom: '24px' }}>
-        <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text)', marginBottom: '16px', textAlign: 'center' }}>
-          Overdue Invoices
-        </h3>
         
+        {/* Header with overdue summary badge */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text)', margin: 0 }}>
+              ⚡ Action Center
+            </h3>
+            {overview.overdueCount > 0 && (
+              <span style={{
+                background: 'rgba(248, 81, 73, 0.15)', color: '#f85149',
+                fontSize: '12px', fontWeight: 600, padding: '4px 12px',
+                borderRadius: '20px', border: '1px solid rgba(248, 81, 73, 0.3)',
+              }}>
+                {overview.overdueCount} overdue • {formatCurrency(overview.totalOverdue)}
+              </span>
+            )}
+          </div>
+          {overview.overdueInvoices.length > 0 && (
+            <button
+              onClick={() => { overview.overdueInvoices.forEach(inv => handleSendReminder(inv.id, inv.invoiceNo)); }}
+              disabled={actionLoading !== null}
+              style={{
+                background: 'linear-gradient(135deg, #f0883e, #f85149)',
+                color: '#fff', border: 'none', borderRadius: '8px',
+                padding: '8px 16px', fontSize: '12px', fontWeight: 600,
+                cursor: 'pointer', opacity: actionLoading ? 0.6 : 1,
+                transition: 'all 0.2s ease',
+              }}
+            >
+              📢 Remind All ({overview.overdueInvoices.length})
+            </button>
+          )}
+        </div>
+
         {overview.overdueInvoices.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '24px', color: 'var(--color-text-muted)' }}>
-            🎉 No overdue invoices!
+          <div style={{ textAlign: 'center', padding: '40px 24px', color: 'var(--color-text-muted)' }}>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎉</div>
+            <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '4px', color: 'var(--color-text-secondary)' }}>All caught up!</div>
+            <div style={{ fontSize: '13px' }}>No overdue invoices. Nice work!</div>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                <th style={{ padding: '12px', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: 500 }}>Name</th>
-                <th style={{ padding: '12px', textAlign: 'right', color: 'var(--color-text-muted)', fontWeight: 500 }}>Price</th>
-                <th style={{ padding: '12px', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: 500 }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {overview.overdueInvoices.map((inv) => (
-                <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border-light)' }}>
-                  <td style={{ padding: '16px 12px', color: 'var(--color-text)' }}>{inv.clientName}</td>
-                  <td style={{ padding: '16px 12px', textAlign: 'right', color: 'var(--color-text)' }}>{formatCurrency(inv.totalAmount)}</td>
-                  <td style={{ padding: '16px 12px', display: 'flex', alignItems: 'center', gap: '8px', color: inv.daysOverdue > 10 ? '#f85149' : '#f0883e' }}>
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: inv.daysOverdue > 10 ? '#f85149' : '#f0883e' }} />
-                    {inv.daysOverdue} days overdue
-                  </td>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                  <th style={{ padding: '12px', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Client</th>
+                  <th style={{ padding: '12px', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Invoice</th>
+                  <th style={{ padding: '12px', textAlign: 'right', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Total</th>
+                  <th style={{ padding: '12px', textAlign: 'right', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Balance Due</th>
+                  <th style={{ padding: '12px', textAlign: 'center', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Overdue</th>
+                  <th style={{ padding: '12px', textAlign: 'right', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {overview.overdueInvoices.map((inv) => {
+                  const balanceDue = inv.totalAmount - (inv.amountPaid || 0);
+                  const severity = inv.daysOverdue > 14 ? 'critical' : inv.daysOverdue > 7 ? 'warning' : 'mild';
+                  const severityColor = severity === 'critical' ? '#f85149' : severity === 'warning' ? '#f0883e' : '#d29922';
+                  const severityBg = severity === 'critical' ? 'rgba(248,81,73,0.1)' : severity === 'warning' ? 'rgba(240,136,62,0.1)' : 'rgba(210,153,34,0.1)';
+                  
+                  return (
+                    <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border-light)', transition: 'background 0.2s' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      {/* Client Name */}
+                      <td style={{ padding: '14px 12px', color: 'var(--color-text)', fontWeight: 500 }}>
+                        {inv.clientName}
+                      </td>
+                      
+                      {/* Invoice Number */}
+                      <td style={{ padding: '14px 12px' }}>
+                        <span style={{ color: 'var(--color-text-secondary)', fontSize: '12px', fontFamily: 'monospace' }}>
+                          {inv.invoiceNo}
+                        </span>
+                      </td>
+                      
+                      {/* Total Amount */}
+                      <td style={{ padding: '14px 12px', textAlign: 'right', color: 'var(--color-text-secondary)' }}>
+                        {formatCurrency(inv.totalAmount)}
+                      </td>
+                      
+                      {/* Balance Due (highlighted) */}
+                      <td style={{ padding: '14px 12px', textAlign: 'right' }}>
+                        <span style={{ color: severityColor, fontWeight: 700, fontSize: '14px' }}>
+                          {formatCurrency(balanceDue)}
+                        </span>
+                      </td>
+                      
+                      {/* Days Overdue Badge */}
+                      <td style={{ padding: '14px 12px', textAlign: 'center' }}>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '4px',
+                          background: severityBg, color: severityColor,
+                          fontSize: '11px', fontWeight: 600, padding: '4px 10px',
+                          borderRadius: '12px', border: `1px solid ${severityColor}30`,
+                        }}>
+                          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: severityColor }} />
+                          {inv.daysOverdue}d
+                        </span>
+                      </td>
+                      
+                      {/* Action Buttons */}
+                      <td style={{ padding: '14px 12px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                          {/* Send Reminder */}
+                          <button
+                            onClick={() => handleSendReminder(inv.id, inv.invoiceNo)}
+                            disabled={actionLoading === `remind-${inv.id}`}
+                            title="Send WhatsApp Reminder"
+                            style={{
+                              background: 'rgba(240, 136, 62, 0.1)', border: '1px solid rgba(240, 136, 62, 0.3)',
+                              color: '#f0883e', borderRadius: '6px', padding: '6px 10px',
+                              fontSize: '12px', cursor: 'pointer', fontWeight: 500,
+                              opacity: actionLoading === `remind-${inv.id}` ? 0.5 : 1,
+                              transition: 'all 0.2s',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {actionLoading === `remind-${inv.id}` ? '⏳' : '📢 Remind'}
+                          </button>
+                          
+                          {/* Mark Paid */}
+                          <button
+                            onClick={() => handleMarkPaid(inv.id, inv.invoiceNo)}
+                            disabled={actionLoading === `paid-${inv.id}`}
+                            title="Mark as Paid"
+                            style={{
+                              background: 'rgba(46, 160, 67, 0.1)', border: '1px solid rgba(46, 160, 67, 0.3)',
+                              color: '#2ea043', borderRadius: '6px', padding: '6px 10px',
+                              fontSize: '12px', cursor: 'pointer', fontWeight: 500,
+                              opacity: actionLoading === `paid-${inv.id}` ? 0.5 : 1,
+                              transition: 'all 0.2s',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {actionLoading === `paid-${inv.id}` ? '⏳' : '✅ Paid'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -195,14 +367,14 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Receivables Aging */}
+        {/* Receivables Aging — now with real data */}
         <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text)', marginBottom: '8px' }}>Receivables Aging</div>
           <div style={{ height: '120px', width: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={agingData}
+                  data={agingData.filter(d => d.value > 0).length > 0 ? agingData : [{ name: 'None', value: 1 }]}
                   cx="50%"
                   cy="50%"
                   innerRadius={35}
@@ -211,8 +383,8 @@ export default function DashboardPage() {
                   dataKey="value"
                   stroke="none"
                 >
-                  {agingData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  {(agingData.filter(d => d.value > 0).length > 0 ? agingData : [{ name: 'None', value: 1 }]).map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={agingData.filter(d => d.value > 0).length > 0 ? COLORS[index % COLORS.length] : '#30363d'} />
                   ))}
                 </Pie>
               </PieChart>
@@ -220,22 +392,26 @@ export default function DashboardPage() {
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', fontSize: '11px', color: 'var(--color-text-muted)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '6px', height: '6px', background: '#2ea043' }}/> Current</span>
-               <span>56%</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '6px', height: '6px', background: '#f0883e' }}/> 30d</span>
-               <span>31%</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '6px', height: '6px', background: '#f85149' }}/> 60d+</span>
-               <span>13%</span>
-            </div>
+            {agingData.map((d, i) => (
+              <div key={d.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: '6px', height: '6px', background: COLORS[i] }}/>
+                  {d.name}
+                </span>
+                <span>{agingTotal > 0 ? Math.round((d.value / agingTotal) * 100) : 0}% • {formatCurrency(d.value)}</span>
+              </div>
+            ))}
           </div>
         </div>
 
       </div>
+
+      <style jsx>{`
+        @keyframes slideIn {
+          from { transform: translateX(100px); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }
