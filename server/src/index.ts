@@ -8,6 +8,7 @@ import { logger } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { startReminderWorker } from './services/reminder.service';
 import { cleanupExpiredOTPs } from './services/auth.service';
+import { prisma } from './db/prisma';
 
 // Routes
 import webhookRoutes from './routes/webhook.routes';
@@ -44,27 +45,56 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 200, // 200 webhook hits per minute per IP (Meta sends bursts)
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const adminLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30, // 30 admin API calls per minute per IP
+  message: { success: false, error: 'Too many requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // ── Static Files (PDF invoices — dev only, R2 in production) ─
 app.use('/invoices', express.static(path.join(__dirname, '..', 'tmp', 'invoices')));
 
-// ── Health Check ──────────────────────────────────────────
-app.get('/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'billkaro-api',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: config.NODE_ENV,
-  });
+// ── Health Check (with DB connectivity) ───────────────────
+app.get('/health', async (_req, res) => {
+  try {
+    // Verify database is reachable
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({
+      status: 'ok',
+      service: 'billkaro-api',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: config.NODE_ENV,
+      db: 'connected',
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: 'degraded',
+      service: 'billkaro-api',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: config.NODE_ENV,
+      db: 'disconnected',
+    });
+  }
 });
 
 // ── API Routes ────────────────────────────────────────────
-app.use('/webhook', webhookRoutes);
+app.use('/webhook', webhookLimiter, webhookRoutes);
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/admin', adminLimiter, adminRoutes);
 
 // ── Error Handling ────────────────────────────────────────
 app.use(notFoundHandler);
@@ -73,7 +103,7 @@ app.use(errorHandler);
 // ── Start Server ──────────────────────────────────────────
 const PORT = config.PORT;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   logger.info(`🚀 BillKaro API running on port ${PORT}`);
   logger.info(`📝 Environment: ${config.NODE_ENV}`);
   logger.info(`🔗 Health check: ${config.APP_URL}/health`);
@@ -96,5 +126,31 @@ app.listen(PORT, () => {
     }
   }, 60 * 60 * 1000); // 1 hour
 });
+
+// ── Graceful Shutdown ─────────────────────────────────────
+// Handles SIGTERM (Railway/Docker) and SIGINT (Ctrl+C)
+// Ensures in-flight requests complete before exiting
+function gracefulShutdown(signal: string) {
+  logger.info(`${signal} received — shutting down gracefully...`);
+  server.close(async () => {
+    try {
+      await prisma.$disconnect();
+      logger.info('Database disconnected');
+    } catch (err) {
+      logger.warn('Error disconnecting database', { error: err });
+    }
+    logger.info('Server shut down cleanly');
+    process.exit(0);
+  });
+
+  // Force shutdown after 10 seconds if graceful shutdown hangs
+  setTimeout(() => {
+    logger.warn('Forced shutdown after 10s timeout');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 export default app;
