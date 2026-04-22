@@ -1,34 +1,20 @@
 import { prisma } from '../db/prisma';
 import { Queue, Worker, Job } from 'bullmq';
-import IORedis from 'ioredis';
 import { PrismaClient, ReminderType, ReminderStatus, InvoiceStatus } from '@prisma/client';
 import { config } from '../config';
+import { getRedisConnection } from '../db/redis';
 import { REMINDER_SCHEDULE } from '../config/constants';
 import { addDays, getNextBusinessDay, scheduleAt10AM, isBusinessHours, formatDateShort } from '../utils/dates';
 import { formatCurrency } from '../utils/currency';
 import { sendTextMessage, sendButtonMessage } from './whatsapp.service';
 import { logger } from '../utils/logger';
 
-
-
-let connection: any = null;
+// Use shared Redis connection (singleton — no duplicate connections)
+const connection = getRedisConnection();
 let reminderQueue: any = null;
 
 try {
-  if (config.REDIS_URL) {
-    connection = new IORedis(config.REDIS_URL, {
-      maxRetriesPerRequest: null,
-      retryStrategy: (times: number) => {
-        if (times > 2) return null;
-        return Math.min(times * 100, 1000);
-      },
-      lazyConnect: true,
-    });
-    connection.connect().catch(() => {
-      logger.warn('Redis not available for reminder queue');
-      connection = null;
-      reminderQueue = null;
-    });
+  if (connection) {
     reminderQueue = new Queue('reminders', { connection });
   }
 } catch (err: any) {

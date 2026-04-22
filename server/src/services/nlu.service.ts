@@ -96,8 +96,39 @@ export async function parseInvoiceFromText(text: string): Promise<ParsedInvoice 
 
 /**
  * Detect if a message is an invoice request or a command
+ * Uses keyword pre-filter to avoid expensive API calls for known patterns
  */
 export async function classifyIntent(text: string): Promise<'invoice' | 'command' | 'unknown'> {
+  const lower = text.toLowerCase().trim();
+
+  // ── Keyword pre-filter (zero cost — no API call) ──
+  // Known command keywords
+  const commandKeywords = [
+    'help', 'madad', 'sahayata',
+    'paid', 'mark paid', 'pay kar diya', 'payment ho gaya', 'paisa aa gaya',
+    'pending', 'due', 'baaki', 'kitna baaki',
+    'pause', 'band karo', 'reminders band', 'stop reminders',
+    'resume', 'chalu karo', 'reminders chalu', 'start reminders',
+    'cancel', 'nahi',
+  ];
+  if (commandKeywords.some(kw => lower.startsWith(kw) || lower === kw)) {
+    return 'command';
+  }
+
+  // Known greeting / unknown patterns — skip API
+  const greetings = ['hi', 'hello', 'hey', 'namaste', 'good morning', 'good evening', 'thanks', 'thank you', 'ok', 'okay', 'haan', 'theek hai'];
+  if (greetings.includes(lower) || lower.length < 3) {
+    return 'unknown';
+  }
+
+  // Quick invoice heuristic: contains a number + a name-like word
+  const hasAmount = /\d{3,}/.test(text); // 3+ digit number
+  const invoiceKeywords = ['bill', 'invoice', 'bana', 'banao', 'create', 'send'];
+  if (hasAmount && invoiceKeywords.some(kw => lower.includes(kw))) {
+    return 'invoice';
+  }
+
+  // ── Fall through to OpenAI for ambiguous messages ──
   try {
     const response = await openai.chat.completions.create({
       model: config.OPENAI_NLU_MODEL,

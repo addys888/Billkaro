@@ -1,31 +1,10 @@
 import { prisma } from '../db/prisma';
 import { PrismaClient } from '@prisma/client';
-import { config } from '../config';
+import { getRedisConnection } from '../db/redis';
 import { logger } from '../utils/logger';
 
-// Try to connect to Redis if available, otherwise use DB-only mode
-let redis: any = null;
-
-try {
-  if (config.REDIS_URL) {
-    const IORedis = require('ioredis');
-    redis = new IORedis(config.REDIS_URL, {
-      maxRetriesPerRequest: 1,
-      retryStrategy: (times: number) => {
-        if (times > 2) return null; // Stop retrying after 2 attempts
-        return Math.min(times * 100, 1000);
-      },
-      lazyConnect: true,
-    });
-    redis.connect().catch((err: any) => {
-      logger.warn('Redis not available, using DB-only sessions', { error: err.message });
-      redis = null;
-    });
-  }
-} catch (err: any) {
-  logger.warn('Redis not available, using DB-only sessions', { error: err.message });
-  redis = null;
-}
+// Use shared Redis connection (singleton — no duplicate connections)
+const redis = getRedisConnection();
 
 const SESSION_TTL = 60 * 30; // 30 minutes
 const SESSION_PREFIX = 'session:';

@@ -46,28 +46,59 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
 });
 
 /**
- * [GET] List all users (SMEs)
+ * [GET] List all users (SMEs) — paginated
+ * Query params: ?page=1&limit=50&search=keyword
  */
 router.get('/users', async (req: AuthRequest, res: Response) => {
   try {
-    const users = await prisma.user.findMany({
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        phone: true,
-        businessName: true,
-        role: true,
-        isSuspended: true,
-        onboardingComplete: true,
-        upiId: true,
-        subscriptionPlan: true,
-        subscriptionStatus: true,
-        subscriptionExpiresAt: true,
-        createdAt: true,
-      }
-    });
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+    const search = (req.query.search as string || '').trim();
+    const skip = (page - 1) * limit;
 
-    res.json({ success: true, users });
+    // Build search filter
+    const where = search
+      ? {
+          OR: [
+            { phone: { contains: search } },
+            { businessName: { contains: search, mode: 'insensitive' as const } },
+          ],
+        }
+      : {};
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          phone: true,
+          businessName: true,
+          role: true,
+          isSuspended: true,
+          onboardingComplete: true,
+          upiId: true,
+          subscriptionPlan: true,
+          subscriptionStatus: true,
+          subscriptionExpiresAt: true,
+          createdAt: true,
+        }
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      users,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     logger.error('Admin users list error', { error });
     res.status(500).json({ success: false, error: 'Failed to fetch users' });
