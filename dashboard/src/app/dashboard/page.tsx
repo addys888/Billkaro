@@ -234,15 +234,17 @@ export default function DashboardPage() {
                   <th style={{ padding: '12px', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Client</th>
                   <th style={{ padding: '12px', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Phone</th>
                   <th style={{ padding: '12px', textAlign: 'left', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Item</th>
-                  <th style={{ padding: '12px', textAlign: 'right', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Total</th>
-                  <th style={{ padding: '12px', textAlign: 'right', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Balance Due</th>
+                  <th style={{ padding: '12px', textAlign: 'right', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Amount Due</th>
                   <th style={{ padding: '12px', textAlign: 'center', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Overdue</th>
                   <th style={{ padding: '12px', textAlign: 'right', color: 'var(--color-text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {overview.overdueInvoices.map((inv) => {
+                {overview.overdueInvoices
+                  .filter(inv => (inv.totalAmount - (inv.amountPaid || 0)) > 0) // Skip fully paid
+                  .map((inv) => {
                   const balanceDue = inv.totalAmount - (inv.amountPaid || 0);
+                  const hasPartialPayment = (inv.amountPaid || 0) > 0;
                   const severity = inv.daysOverdue > 14 ? 'critical' : inv.daysOverdue > 7 ? 'warning' : 'mild';
                   const severityColor = severity === 'critical' ? '#f85149' : severity === 'warning' ? '#f0883e' : '#d29922';
                   const severityBg = severity === 'critical' ? 'rgba(248,81,73,0.1)' : severity === 'warning' ? 'rgba(240,136,62,0.1)' : 'rgba(210,153,34,0.1)';
@@ -278,16 +280,16 @@ export default function DashboardPage() {
                         </span>
                       </td>
                       
-                      {/* Total Amount */}
-                      <td style={{ padding: '14px 12px', textAlign: 'right', color: 'var(--color-text-secondary)' }}>
-                        {formatCurrency(inv.totalAmount)}
-                      </td>
-                      
-                      {/* Balance Due (highlighted) */}
+                      {/* Amount Due — single clear column */}
                       <td style={{ padding: '14px 12px', textAlign: 'right' }}>
                         <span style={{ color: severityColor, fontWeight: 700, fontSize: '14px' }}>
                           {formatCurrency(balanceDue)}
                         </span>
+                        {hasPartialPayment && (
+                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                            of {formatCurrency(inv.totalAmount)} total
+                          </div>
+                        )}
                       </td>
                       
                       {/* Days Overdue Badge */}
