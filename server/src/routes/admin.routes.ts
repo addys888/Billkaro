@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../db/prisma';
 import { AuthRequest, authMiddleware } from '../middleware/auth.middleware';
 import { adminMiddleware } from '../middleware/admin.middleware';
+import { SUPER_ADMINS } from '../config/constants';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -19,8 +20,8 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
     today.setHours(0, 0, 0, 0);
 
     const [totalUsers, activeUsers, totalInvoices, dailyInvoices, revenue] = await Promise.all([
-      prisma.user.count({ where: { role: { not: 'super_admin' } } }),
-      prisma.user.count({ where: { role: { not: 'super_admin' }, subscriptionStatus: 'active', isSuspended: false } }),
+      prisma.user.count({ where: { phone: { notIn: [...SUPER_ADMINS] } } }),
+      prisma.user.count({ where: { phone: { notIn: [...SUPER_ADMINS] }, subscriptionStatus: 'active', isSuspended: false } }),
       prisma.invoice.count(),
       prisma.invoice.count({ where: { createdAt: { gte: today } } }),
       prisma.invoice.aggregate({
@@ -56,8 +57,8 @@ router.get('/users', async (req: AuthRequest, res: Response) => {
     const search = (req.query.search as string || '').trim();
     const skip = (page - 1) * limit;
 
-    // Build search filter — exclude super_admin accounts (system accounts)
-    const baseFilter = { role: { not: 'super_admin' } };
+    // Build search filter — exclude super admin accounts by phone
+    const baseFilter = { phone: { notIn: [...SUPER_ADMINS] } };
     const where = search
       ? {
           ...baseFilter,
