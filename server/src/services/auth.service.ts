@@ -86,23 +86,14 @@ export async function verifyOTP(
     data: { verified: true },
   });
 
-  // Find or create user
-  let user = await prisma.user.findUnique({ where: { phone } });
+  // Find user — must already exist (invite-only; admin pre-registers merchants)
+  const user = await prisma.user.findUnique({ where: { phone } });
 
   if (!user) {
-    // Create new user with 7-day free trial
-    const trialExpiry = new Date();
-    trialExpiry.setDate(trialExpiry.getDate() + 7);
-
-    user = await prisma.user.create({
-      data: {
-        phone,
-        businessName: 'My Business',
-        subscriptionPlan: "Trial",
-        subscriptionStatus: "active",
-        subscriptionExpiresAt: trialExpiry,
-      },
-    });
+    // This should never happen: send-otp route blocks unregistered users.
+    // But if it does, refuse login rather than silently creating an account.
+    logger.warn('OTP verified but no user record found — possible bypass attempt', { phone: phone.slice(-4) });
+    return null;
   }
 
   // Generate JWT

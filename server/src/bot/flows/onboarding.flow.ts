@@ -22,11 +22,15 @@ export async function handleOnboardingStep(
       text: `🎉 *Welcome to BillKaro!*\n\nLet's set up your business in 90 seconds.\n\n1️⃣ What is your *Business Name*?`,
     });
 
-    // Create user placeholder
-    await prisma.user.create({
-      data: {
+    // Create user placeholder (upsert to prevent crash if record already exists)
+    await prisma.user.upsert({
+      where: { phone },
+      create: {
         phone,
         businessName: 'My Business',
+        onboardingComplete: false,
+      },
+      update: {
         onboardingComplete: false,
       },
     });

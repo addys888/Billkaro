@@ -22,7 +22,66 @@ export async function handleIncomingMessage(message: any, senderPhone: string): 
       await markAsRead(message.id);
     }
 
-    // Extract text from message (text or voice note)
+    // ── STEP 1: Look up user FIRST (before any message type processing) ──
+    const user = await prisma.user.findUnique({ where: { phone: senderPhone } });
+
+    // Block suspended users immediately
+    if (user && user.isSuspended) {
+      await sendTextMessage({
+        to: senderPhone,
+        text: '🚫 *Account Suspended*\n\nYour BillKaro account is currently suspended. Access to both the dashboard and WhatsApp bot is restricted.\n\nPlease contact the administrator for more information.',
+      });
+      return;
+    }
+
+    // ── STEP 2: Check subscription expiry for bot access ──
+    if (user && user.subscriptionExpiresAt && new Date(user.subscriptionExpiresAt) < new Date()) {
+      await sendTextMessage({
+        to: senderPhone,
+        text: '⏳ *Subscription Expired*\n\nYour BillKaro subscription has expired. Please renew to continue creating invoices.\n\n📊 Dashboard: https://billkaro.celerapps.com\n📧 Contact: hello@celerapps.com',
+      });
+      return;
+    }
+
+    // ── STEP 3: Handle messages by type ──
+
+    // --- IMAGE MESSAGES ---
+    if (message.type === 'image') {
+      const imageId = message.image?.id;
+      const mimeType = message.image?.mime_type || 'image/jpeg';
+      if (imageId) {
+        // If sender is a registered user → tell them images aren't supported for invoicing
+        if (user) {
+          await sendTextMessage({
+            to: senderPhone,
+            text: '📷 I received your image, but I can only process text commands for invoicing.\n\n💡 To create an invoice, type:\n"Bill 5000 to Rahul for AC repair"',
+          });
+          return;
+        }
+        // Not a registered user → check if they're a known client (payment screenshot)
+        await handleImageMessage(senderPhone, imageId, mimeType);
+        return;
+      }
+    }
+
+    // --- INTERACTIVE BUTTON REPLIES ---
+    if (message.type === 'interactive') {
+      const buttonId = message.interactive?.button_reply?.id;
+      if (buttonId) {
+        // Buttons only work for registered users (onboarding + invoice flows)
+        if (!user) {
+          await sendTextMessage({
+            to: senderPhone,
+            text: '🔒 *Access Restricted*\n\nBillKaro is an invite-only platform.\nPlease contact hello@celerapps.com to get started.',
+          });
+          return;
+        }
+        await handleInteractiveReply(senderPhone, buttonId);
+        return;
+      }
+    }
+
+    // --- TEXT / VOICE MESSAGES ---
     let text = '';
 
     if (message.type === 'text') {
@@ -59,21 +118,6 @@ export async function handleIncomingMessage(message: any, senderPhone: string): 
         });
         return;
       }
-    } else if (message.type === 'image') {
-      // Image received — could be a payment screenshot from client
-      const imageId = message.image?.id;
-      const mimeType = message.image?.mime_type || 'image/jpeg';
-      if (imageId) {
-        await handleImageMessage(senderPhone, imageId, mimeType);
-        return;
-      }
-    } else if (message.type === 'interactive') {
-      // Button reply
-      const buttonId = message.interactive?.button_reply?.id;
-      if (buttonId) {
-        await handleInteractiveReply(senderPhone, buttonId);
-        return;
-      }
     } else {
       // Unsupported message type
       await sendTextMessage({
@@ -85,20 +129,7 @@ export async function handleIncomingMessage(message: any, senderPhone: string): 
 
     if (!text.trim()) return;
 
-    // Check if this is a new user who needs onboarding
-    const user = await prisma.user.findUnique({ where: { phone: senderPhone } });
-    
-    // Block suspended users
-    if (user && user.isSuspended) {
-      await sendTextMessage({
-        to: senderPhone,
-        text: '🚫 *Account Suspended*\n\nYour BillKaro account is currently suspended. Access to both the dashboard and WhatsApp bot is restricted.\n\nPlease contact the administrator for more information.',
-      });
-      return;
-    }
-
-    // ── Handle client replies (UTR / payment confirmation) ──
-    // If sender is NOT a registered user, check if they're a known client
+    // ── STEP 4: Handle known clients replying (UTR / payment confirmation) ──
     if (!user) {
       const isClientReply = await handleClientReply(senderPhone, text);
       if (isClientReply) return;
@@ -122,12 +153,13 @@ export async function handleIncomingMessage(message: any, senderPhone: string): 
       return;
     }
 
+    // ── STEP 5: Handle onboarding for incomplete users ──
     if (!user.onboardingComplete) {
       await handleOnboardingStep(senderPhone, text, user);
       return;
     }
 
-    // Check if there's an active flow/session
+    // ── STEP 6: Check active session flows ──
     const session = await getSession(senderPhone);
     if (session.currentFlow) {
       switch (session.currentFlow) {
@@ -144,7 +176,7 @@ export async function handleIncomingMessage(message: any, senderPhone: string): 
       }
     }
 
-    // Classify intent for new messages
+    // ── STEP 7: Classify intent for new messages ──
     const intent = await classifyIntent(text);
 
     switch (intent) {
@@ -404,24 +436,12 @@ async function handleClientReply(clientPhone: string, text: string): Promise<boo
 }
 
 /**
- * Handle image messages — UPI payment screenshot analysis
+ * Handle image messages from clients — UPI payment screenshot analysis
+ * Note: Registered merchants are handled upstream; this only processes client screenshots
  */
 async function handleImageMessage(senderPhone: string, imageId: string, mimeType: string): Promise<void> {
   try {
-    // Check if sender is a registered merchant
-    const user = await prisma.user.findUnique({ where: { phone: senderPhone } });
-    
-    if (user) {
-      // Merchant sent an image — not relevant for payment verification
-      await sendTextMessage({
-        to: senderPhone,
-        text: '📷 I received your image, but I can only process text commands for invoicing.\n\n💡 To create an invoice, type:\n"Bill 5000 to Rahul for AC repair"',
-      });
-      return;
-    }
-
     // Find the most recent pending invoice sent to this client phone
-    // Query invoices directly (not via client) to avoid matching wrong merchant's client
     const invoice = await prisma.invoice.findFirst({
       where: {
         status: { in: ['PENDING', 'PARTIALLY_PAID', 'OVERDUE'] },
@@ -433,10 +453,10 @@ async function handleImageMessage(senderPhone: string, imageId: string, mimeType
     });
 
     if (!invoice) {
-      // Unknown sender — ignore image
+      // Unknown sender — not a known client
       await sendTextMessage({
         to: senderPhone,
-        text: '👋 Hi! To get started with BillKaro, please ask your business to send you an invoice first.',
+        text: '🔒 *Access Restricted*\n\nBillKaro is an invite-only platform.\nPlease contact hello@celerapps.com to get started.',
       });
       return;
     }

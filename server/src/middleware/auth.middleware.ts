@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../services/auth.service';
+import { SUPER_ADMINS } from '../config/constants';
 import { logger } from '../utils/logger';
 
 export interface AuthRequest extends Request {
@@ -39,6 +40,22 @@ export async function authMiddleware(
     if (user.isSuspended) {
       res.status(403).json({ success: false, error: 'Your account has been suspended. Please contact support.' });
       return;
+    }
+
+    // Enforce subscription expiry (skip for super admins)
+    if (!SUPER_ADMINS.includes(user.phone)) {
+      if (user.subscriptionExpiresAt && new Date(user.subscriptionExpiresAt) < new Date()) {
+        // Allow read-only access (GET requests) but block writes
+        const isReadOnly = req.method === 'GET';
+        if (!isReadOnly) {
+          res.status(402).json({
+            success: false,
+            error: 'Your subscription has expired. Please renew to continue using BillKaro.',
+            code: 'SUBSCRIPTION_EXPIRED',
+          });
+          return;
+        }
+      }
     }
 
     next();
