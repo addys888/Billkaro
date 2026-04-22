@@ -168,6 +168,19 @@ const server = app.listen(PORT, () => {
     } catch (err) {
       logger.warn('Startup overdue check failed', { error: err });
     }
+
+    // ── One-time data fix: Rename business for admin account ──
+    try {
+      const updated = await prisma.user.updateMany({
+        where: { phone: '919452661608', businessName: 'Mindzvue Technology LLP' },
+        data: { businessName: 'BillKaro By CelerApps' },
+      });
+      if (updated.count > 0) {
+        logger.info('✅ Renamed business: Mindzvue Technology LLP → BillKaro By CelerApps');
+      }
+    } catch (err) {
+      logger.warn('Business name migration failed', { error: err });
+    }
   })();
 });
 
