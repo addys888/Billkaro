@@ -26,6 +26,8 @@ function getMerchantCode(businessName: string): string {
  * - AH = First + Last char of merchant's business name
  * - 2604 = Year(2-digit) + Month(2-digit)
  * - 0001 = Sequential number per merchant per FY
+ *
+ * Uses retry logic to handle concurrent invoice creation
  */
 export async function generateInvoiceNumber(userId: string, businessName?: string): Promise<string> {
   const prefix = config.INVOICE_PREFIX;
@@ -53,27 +55,46 @@ export async function generateInvoiceNumber(userId: string, businessName?: strin
   const fyStartYear = parseInt(currentFY.split('-')[0], 10);
   const fyStart = new Date(fyStartYear, 3, 1); // April 1st
 
-  const latestInvoice = await prisma.invoice.findFirst({
-    where: {
-      userId,
-      createdAt: { gte: fyStart },
-    },
-    orderBy: { createdAt: 'desc' },
-    select: { invoiceNo: true },
-  });
+  // Retry up to 3 times to handle concurrent invoice creation
+  const MAX_RETRIES = 3;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const latestInvoice = await prisma.invoice.findFirst({
+      where: {
+        userId,
+        createdAt: { gte: fyStart },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { invoiceNo: true },
+    });
 
-  let nextNum = 1;
-  if (latestInvoice?.invoiceNo) {
-    // Extract the sequence part (last segment after final dash)
-    const parts = latestInvoice.invoiceNo.split('-');
-    const lastNum = parseInt(parts[parts.length - 1], 10);
-    if (!isNaN(lastNum)) {
-      nextNum = lastNum + 1;
+    let nextNum = 1;
+    if (latestInvoice?.invoiceNo) {
+      // Extract the sequence part (last segment after final dash)
+      const parts = latestInvoice.invoiceNo.split('-');
+      const lastNum = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(lastNum)) {
+        nextNum = lastNum + 1 + attempt; // Add attempt offset to skip collisions
+      }
     }
+
+    const seq = nextNum.toString().padStart(4, '0');
+    const invoiceNo = `${prefix}-${merchantCode}-${yy}${mm}-${seq}`;
+
+    // Check if this number already exists (defensive)
+    const existing = await prisma.invoice.findFirst({
+      where: { userId, invoiceNo },
+    });
+
+    if (!existing) {
+      return invoiceNo;
+    }
+
+    // Collision detected — retry with next number
   }
 
-  const seq = nextNum.toString().padStart(4, '0');
-  return `${prefix}-${merchantCode}-${yy}${mm}-${seq}`;
+  // Fallback: use timestamp-based suffix if all retries fail
+  const fallbackSeq = Date.now().toString().slice(-6);
+  return `${prefix}-${merchantCode}-${yy}${mm}-${fallbackSeq}`;
 }
 
 /**

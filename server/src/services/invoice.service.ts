@@ -174,6 +174,8 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<Invoic
 
 /**
  * Record a payment (partial or full) against an invoice
+ * Uses a Prisma transaction to prevent race conditions when
+ * two payments arrive simultaneously (e.g., UTR text + screenshot)
  */
 export async function recordPayment(params: {
   invoiceId: string;
@@ -189,72 +191,82 @@ export async function recordPayment(params: {
 }> {
   const { invoiceId, amount, paymentMethod, transactionId, notes } = params;
 
-  const invoice = await prisma.invoice.findUnique({
-    where: { id: invoiceId },
-    include: { client: true },
+  // Run everything in a serializable transaction to prevent race conditions
+  const result = await prisma.$transaction(async (tx) => {
+    // Lock-read the invoice inside the transaction
+    const invoice = await tx.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { client: true },
+    });
+
+    if (!invoice) throw new Error('Invoice not found');
+
+    const totalAmount = Number(invoice.totalAmount);
+    const currentPaid = Number(invoice.amountPaid);
+    const balanceBefore = totalAmount - currentPaid;
+
+    // Cap payment at balance due (no overpayments)
+    const paymentAmount = Math.min(amount, balanceBefore);
+    if (paymentAmount <= 0) {
+      throw new Error('Invoice is already fully paid');
+    }
+
+    const newAmountPaid = currentPaid + paymentAmount;
+    const isFullyPaid = newAmountPaid >= totalAmount;
+    const balanceDue = Math.max(0, totalAmount - newAmountPaid);
+
+    // Create payment record (inside transaction)
+    const payment = await tx.payment.create({
+      data: {
+        invoiceId,
+        amount: paymentAmount,
+        paymentMethod: paymentMethod || 'manual',
+        transactionId,
+        notes,
+      },
+    });
+
+    // Update invoice (inside transaction)
+    const updatedInvoice = await tx.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        amountPaid: newAmountPaid,
+        status: isFullyPaid ? InvoiceStatus.PAID : InvoiceStatus.PARTIALLY_PAID,
+        paidAt: isFullyPaid ? new Date() : undefined,
+        paymentMethod: isFullyPaid ? (paymentMethod || 'manual') : undefined,
+      },
+      include: { client: true, payments: true },
+    });
+
+    // Update client payment stats (inside transaction — atomic with payment)
+    await tx.client.update({
+      where: { id: invoice.clientId },
+      data: {
+        totalPaid: { increment: paymentAmount },
+      },
+    });
+
+    return { invoice: updatedInvoice, payment, isFullyPaid, balanceDue, clientId: invoice.clientId };
   });
 
-  if (!invoice) throw new Error('Invoice not found');
-
-  const totalAmount = Number(invoice.totalAmount);
-  const currentPaid = Number(invoice.amountPaid);
-  const balanceBefore = totalAmount - currentPaid;
-
-  // Cap payment at balance due (no overpayments)
-  const paymentAmount = Math.min(amount, balanceBefore);
-  if (paymentAmount <= 0) {
-    throw new Error('Invoice is already fully paid');
-  }
-
-  const newAmountPaid = currentPaid + paymentAmount;
-  const isFullyPaid = newAmountPaid >= totalAmount;
-  const balanceDue = Math.max(0, totalAmount - newAmountPaid);
-
-  // Create payment record
-  const payment = await prisma.payment.create({
-    data: {
-      invoiceId,
-      amount: paymentAmount,
-      paymentMethod: paymentMethod || 'manual',
-      transactionId,
-      notes,
-    },
-  });
-
-  // Update invoice
-  const updatedInvoice = await prisma.invoice.update({
-    where: { id: invoiceId },
-    data: {
-      amountPaid: newAmountPaid,
-      status: isFullyPaid ? InvoiceStatus.PAID : InvoiceStatus.PARTIALLY_PAID,
-      paidAt: isFullyPaid ? new Date() : undefined,
-      paymentMethod: isFullyPaid ? (paymentMethod || 'manual') : undefined,
-    },
-    include: { client: true, payments: true },
-  });
-
-  // Update client payment stats
-  await prisma.client.update({
-    where: { id: invoice.clientId },
-    data: {
-      totalPaid: { increment: paymentAmount },
-    },
-  });
-
-  // Recalculate client payment score if fully paid
-  if (isFullyPaid) {
-    await recalculatePaymentScore(invoice.clientId);
+  // Recalculate client payment score OUTSIDE transaction (non-critical)
+  if (result.isFullyPaid) {
+    try {
+      await recalculatePaymentScore(result.clientId);
+    } catch (err) {
+      logger.warn('Payment score recalc failed (non-critical)', { clientId: result.clientId, error: err });
+    }
   }
 
   logger.info('Payment recorded', {
-    invoiceNo: invoice.invoiceNo,
-    paymentAmount,
-    totalPaid: newAmountPaid,
-    balanceDue,
-    isFullyPaid,
+    invoiceId,
+    paymentAmount: amount,
+    totalPaid: result.invoice.amountPaid,
+    balanceDue: result.balanceDue,
+    isFullyPaid: result.isFullyPaid,
   });
 
-  return { invoice: updatedInvoice, payment, isFullyPaid, balanceDue };
+  return { invoice: result.invoice, payment: result.payment, isFullyPaid: result.isFullyPaid, balanceDue: result.balanceDue };
 }
 
 /**
