@@ -183,10 +183,14 @@ router.post('/:id/resend', async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    const balanceDue = Number(invoice.totalAmount) - Number(invoice.amountPaid || 0);
+    const displayAmount = balanceDue > 0 ? balanceDue : Number(invoice.totalAmount);
+    const partialNote = Number(invoice.amountPaid || 0) > 0
+      ? `\n💵 Already received: ${formatCurrency(Number(invoice.amountPaid))}` : '';
     const upiLine = invoice.user.upiId ? `\n📲 UPI ID: ${invoice.user.upiId}` : '';
     await sendTextMessage({
       to: invoice.client.phone,
-      text: `🧾 *Invoice from ${invoice.user.businessName}*\n\nHi ${invoice.client.name},\n\nKindly clear your pending invoice #${invoice.invoiceNo} for ${formatCurrency(Number(invoice.totalAmount))}.${upiLine}\n\n*Zero convenience fee* — pay directly 💰\n\nThank you! 🙏\n— ${invoice.user.businessName}`,
+      text: `🧾 *Invoice from ${invoice.user.businessName}*\n\nHi ${invoice.client.name},\n\nKindly clear your pending invoice #${invoice.invoiceNo} for ${formatCurrency(displayAmount)}.${partialNote}${upiLine}\n\n*Zero convenience fee* — pay directly 💰\n\nThank you! 🙏\n— ${invoice.user.businessName}`,
     });
 
     if (invoice.pdfUrl) {

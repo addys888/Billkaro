@@ -9,6 +9,7 @@ import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { startReminderWorker } from './services/reminder.service';
 import { cleanupExpiredOTPs } from './services/auth.service';
 import { prisma } from './db/prisma';
+import { InvoiceStatus } from '@prisma/client';
 
 // Routes
 import webhookRoutes from './routes/webhook.routes';
@@ -125,6 +126,49 @@ const server = app.listen(PORT, () => {
       logger.warn('OTP cleanup failed', { error: err });
     }
   }, 60 * 60 * 1000); // 1 hour
+
+  // BUG #4 FIX: Auto-update overdue invoice statuses every hour
+  // This ensures invoices are marked OVERDUE even without Redis/reminders
+  setInterval(async () => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const result = await prisma.invoice.updateMany({
+        where: {
+          status: { in: [InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID] },
+          dueDate: { lt: today },
+        },
+        data: { status: InvoiceStatus.OVERDUE },
+      });
+
+      if (result.count > 0) {
+        logger.info(`⏰ Marked ${result.count} invoices as OVERDUE`);
+      }
+    } catch (err) {
+      logger.warn('Overdue status update failed', { error: err });
+    }
+  }, 60 * 60 * 1000); // 1 hour
+
+  // Also run once at startup
+  (async () => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const result = await prisma.invoice.updateMany({
+        where: {
+          status: { in: [InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID] },
+          dueDate: { lt: today },
+        },
+        data: { status: InvoiceStatus.OVERDUE },
+      });
+      if (result.count > 0) {
+        logger.info(`⏰ Startup: Marked ${result.count} invoices as OVERDUE`);
+      }
+    } catch (err) {
+      logger.warn('Startup overdue check failed', { error: err });
+    }
+  })();
 });
 
 // ── Graceful Shutdown ─────────────────────────────────────

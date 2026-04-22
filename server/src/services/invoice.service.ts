@@ -277,13 +277,11 @@ export async function markInvoicePaid(
   paymentMethod: string = 'manual',
   transactionId?: string
 ): Promise<void> {
-  const invoice = await prisma.invoice.findUnique({ where: { id: invoiceId } });
-  if (!invoice) throw new Error('Invoice not found');
-
-  const balanceDue = Number(invoice.totalAmount) - Number(invoice.amountPaid);
+  // BUG #7 FIX: Use a very large amount — recordPayment will cap it at
+  // the actual balanceDue inside its transaction (no stale read race).
   await recordPayment({
     invoiceId,
-    amount: balanceDue,
+    amount: Number.MAX_SAFE_INTEGER,
     paymentMethod,
     transactionId,
   });
@@ -343,11 +341,12 @@ async function findOrCreateClient(
     if (existing) return existing;
   }
 
-  // Try to find by name (fuzzy match)
+  // BUG #12 FIX: Use exact name match (case-insensitive) to avoid merging
+  // "Ram" with "Ramesh", "Ramaswamy", etc.
   const byName = await prisma.client.findFirst({
     where: {
       userId,
-      name: { contains: name, mode: 'insensitive' },
+      name: { equals: name, mode: 'insensitive' },
     },
   });
   if (byName) return byName;

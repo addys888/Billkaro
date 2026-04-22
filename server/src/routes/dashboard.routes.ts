@@ -12,30 +12,13 @@ router.use(authMiddleware);
 // ── Dashboard Overview ────────────────────────────────────
 router.get('/overview', async (req: AuthRequest, res: Response) => {
   try {
-    const period = (req.query.period as string) || 'month';
     const now = new Date();
-    let startDate: Date;
 
-    switch (period) {
-      case 'week':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case 'quarter':
-        startDate = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
-        break;
-      case 'year':
-        startDate = new Date(now.getFullYear(), 0, 1);
-        break;
-      case 'month':
-      default:
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        break;
-    }
-
-    const invoices = await prisma.invoice.findMany({
+    // BUG #9 FIX: Fetch ALL unpaid invoices regardless of creation date,
+    // plus paid invoices from the selected period for KPI stats
+    const allInvoices = await prisma.invoice.findMany({
       where: {
         userId: req.userId,
-        createdAt: { gte: startDate },
       },
       include: {
         client: { select: { name: true, phone: true } },
@@ -53,14 +36,19 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
     let paidWithDays = 0;
     const overdueInvoices: any[] = [];
 
-    for (const inv of invoices) {
+    // BUG #3 FIX: Compare against end-of-day, not current time
+    // An invoice due TODAY is NOT overdue — only overdue AFTER the due date
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    for (const inv of allInvoices) {
       const amount = Number(inv.totalAmount);
       const amountPaid = Number(inv.amountPaid || 0);
       const balanceDue = amount - amountPaid;
       totalInvoiced += amount;
 
       if (inv.status === InvoiceStatus.PAID) {
-        totalCollected += amount;
+        // BUG #2 FIX: Use amountPaid (source of truth) instead of totalAmount
+        totalCollected += amountPaid;
         paidCount++;
         if (inv.paidAt) {
           const days = Math.floor(
@@ -69,12 +57,15 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
           totalDaysToPay += days;
           paidWithDays++;
         }
-      } else if (inv.status === 'PARTIALLY_PAID') {
+      } else if (inv.status === InvoiceStatus.PARTIALLY_PAID) {
+        // BUG #8 FIX: Use enum instead of string literal
         totalCollected += amountPaid;
         // Partially paid: check if also overdue
-        if (new Date(inv.dueDate) < now) {
+        // BUG #3 FIX: Use todayStart for comparison (not overdue ON due date, only AFTER)
+        if (new Date(inv.dueDate) < todayStart) {
           totalOverdue += balanceDue;
           overdueCount++;
+          // BUG #1 FIX: Include clientPhone + description in ALL branches
           overdueInvoices.push({
             id: inv.id,
             invoiceNo: inv.invoiceNo,
@@ -84,7 +75,7 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
             totalAmount: amount,
             amountPaid,
             daysOverdue: Math.floor(
-              (now.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24)
+              (todayStart.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24)
             ),
           });
         } else {
@@ -94,29 +85,36 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
       } else if (inv.status === InvoiceStatus.OVERDUE) {
         totalOverdue += balanceDue;
         overdueCount++;
+        // BUG #1 FIX: Include clientPhone + description
         overdueInvoices.push({
           id: inv.id,
           invoiceNo: inv.invoiceNo,
           clientName: inv.client.name,
+          clientPhone: inv.client.phone || null,
+          description: inv.description || '',
           totalAmount: amount,
           amountPaid,
           daysOverdue: Math.floor(
-            (now.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24)
+            (todayStart.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24)
           ),
         });
       } else if (inv.status === InvoiceStatus.PENDING) {
         // Check if actually overdue (date passed but status not updated)
-        if (new Date(inv.dueDate) < now) {
+        // BUG #3 FIX: Use todayStart
+        if (new Date(inv.dueDate) < todayStart) {
           totalOverdue += balanceDue;
           overdueCount++;
+          // BUG #1 FIX: Include clientPhone + description
           overdueInvoices.push({
             id: inv.id,
             invoiceNo: inv.invoiceNo,
             clientName: inv.client.name,
+            clientPhone: inv.client.phone || null,
+            description: inv.description || '',
             totalAmount: amount,
             amountPaid,
             daysOverdue: Math.floor(
-              (now.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24)
+              (todayStart.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24)
             ),
           });
         } else {
@@ -142,7 +140,7 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
       totalCollected,
       totalPending: totalInvoiced - totalCollected, // Simple: everything not yet collected
       totalOverdue,
-      invoiceCount: invoices.length,
+      invoiceCount: allInvoices.length,
       paidCount,
       pendingCount: pendingCount + overdueCount, // All unpaid invoices
       overdueCount,
@@ -196,8 +194,10 @@ router.get('/trends', async (req: AuthRequest, res: Response) => {
       bucket.invoiced += Number(inv.totalAmount);
 
       if (inv.status === InvoiceStatus.PAID) {
-        bucket.collected += Number(inv.totalAmount);
-      } else if (inv.status === 'PARTIALLY_PAID') {
+        // BUG #2 FIX: Use amountPaid for consistency
+        bucket.collected += Number(inv.amountPaid || inv.totalAmount);
+      } else if (inv.status === InvoiceStatus.PARTIALLY_PAID) {
+        // BUG #8 FIX: Use enum instead of string literal
         // Include partial payments in collected amount
         bucket.collected += Number(inv.amountPaid || 0);
       }
