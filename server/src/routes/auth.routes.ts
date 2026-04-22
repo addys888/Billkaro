@@ -3,6 +3,7 @@ import { sendOTP, verifyOTP } from '../services/auth.service';
 import { logger } from '../utils/logger';
 import { prisma } from '../db/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
+import { SUPER_ADMINS } from '../config/constants';
 
 const router = Router();
 
@@ -124,7 +125,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
       daysRemaining = 14; 
     }
 
-    const SUPER_ADMINS = ['919452661608', '919082573335'];
+
 
     res.json({
       success: true,

@@ -12,7 +12,6 @@ router.get('/whatsapp', verifyWhatsAppWebhook);
 // ── WhatsApp Incoming Messages (POST) ─────────────────────
 router.post('/whatsapp', verifyWebhookSignature, async (req: Request, res: Response) => {
   try {
-    require('fs').writeFileSync('/tmp/billkaro_webhook.json', JSON.stringify(req.body, null, 2));
     // Always respond 200 immediately to WhatsApp
     res.sendStatus(200);
 

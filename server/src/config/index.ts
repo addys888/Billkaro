@@ -23,6 +23,7 @@ const envSchema = z.object({
   WHATSAPP_VERIFY_TOKEN: z.string(),
   WHATSAPP_BUSINESS_ACCOUNT_ID: z.string().default(''),
   WHATSAPP_API_VERSION: z.string().default('v21.0'),
+  META_APP_SECRET: z.string().default(''),
 
   OPENAI_API_KEY: z.string(),
   OPENAI_NLU_MODEL: z.string().default('gpt-4o-mini'),

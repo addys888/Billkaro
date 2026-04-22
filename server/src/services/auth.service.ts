@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { config } from '../config';
 import { sendTextMessage, sendTemplateMessage } from './whatsapp.service';
+import { SUPER_ADMINS } from '../config/constants';
 import { logger } from '../utils/logger';
 
 
@@ -28,8 +29,8 @@ export async function sendOTP(phone: string): Promise<void> {
 
   if (phone === botPhone || phone === '918887360053') {
     // Bot's own number — can't send WhatsApp to itself
-    // OTP is saved in DB, log it server-side for manual use
-    logger.info(`🔐 OTP for bot number ${phone}: ${code} (WhatsApp delivery skipped — bot can't message itself)`);
+    // OTP is saved in DB; admin must check Railway logs for bot login
+    logger.info(`🔐 OTP generated for bot number (***${phone.slice(-4)}). Check DB to retrieve code.`);
     return;
   }
 
@@ -121,7 +122,7 @@ export async function verifyOTP(
       onboardingComplete: user.onboardingComplete,
       upiId: user.upiId,
       address: user.businessAddress,
-      role: ['919452661608', '919082573335'].includes(user.phone) ? 'admin' : user.role,
+      role: SUPER_ADMINS.includes(user.phone) ? 'admin' : user.role,
       subscription: {
         plan: user.subscriptionPlan,
         status: user.subscriptionStatus,

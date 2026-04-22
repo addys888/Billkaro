@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from './auth.middleware';
+import { SUPER_ADMINS } from '../config/constants';
 
-const SUPER_ADMINS = ['919452661608', '919082573335'];
 
 /**
  * Middleware to restrict access to ADMIN only

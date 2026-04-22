@@ -1,3 +1,7 @@
+// ── Super Admin Phone Numbers ───────────────────────────────
+// Centralized list — update here to add/remove admins everywhere
+export const SUPER_ADMINS = ['919452661608', '919082573335'] as const;
+
 // ── Invoice Constants ───────────────────────────────────────
 export const INVOICE_PREFIX = 'BK';
 export const FINANCIAL_YEAR_START_MONTH = 3; // April (0-indexed)
