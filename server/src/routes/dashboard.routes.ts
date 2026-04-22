@@ -138,11 +138,11 @@ router.get('/overview', async (req: AuthRequest, res: Response) => {
     res.json({
       totalInvoiced,
       totalCollected,
-      totalPending,
+      totalPending: totalInvoiced - totalCollected, // Simple: everything not yet collected
       totalOverdue,
       invoiceCount: invoices.length,
       paidCount,
-      pendingCount,
+      pendingCount: pendingCount + overdueCount, // All unpaid invoices
       overdueCount,
       collectionRate,
       avgDaysToPay,
